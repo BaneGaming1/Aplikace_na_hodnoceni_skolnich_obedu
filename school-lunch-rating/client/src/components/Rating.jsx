@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function Rating() {
+const Rating = () => {
   const [rating, setRating] = useState({
     chut: '',
     teplota: '',
@@ -65,6 +65,6 @@ function Rating() {
       </form>
     </div>
   );
-}
+};
 
 export default Rating;
