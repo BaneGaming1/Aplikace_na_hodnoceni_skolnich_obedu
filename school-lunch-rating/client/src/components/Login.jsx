@@ -10,34 +10,44 @@ const Login = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Přihlášení:', credentials);
     navigate('/menu');
   };
 
   return (
-    <div className="login-container">
-      <h2>Přihlášení do aplikace</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Email:</label>
-          <input
-            type="email"
-            value={credentials.email}
-            onChange={(e) => setCredentials({...credentials, email: e.target.value})}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label>Heslo:</label>
-          <input
-            type="password"
-            value={credentials.password}
-            onChange={(e) => setCredentials({...credentials, password: e.target.value})}
-            required
-          />
-        </div>
-        <button type="submit">Přihlásit se</button>
-      </form>
+    <div className="login-page">
+      <div className="login-box">
+        <h1>Přihlášení</h1>
+        <p className="subtitle">Systém hodnocení školních obědů</p>
+        
+        <form onSubmit={handleSubmit}>
+          <div className="input-group">
+            <input
+              type="email"
+              value={credentials.email}
+              onChange={(e) => setCredentials({...credentials, email: e.target.value})}
+              placeholder="Školní email"
+              required
+              className="login-input"
+            />
+          </div>
+
+          <div className="input-group">
+            <input
+              type="password"
+              value={credentials.password}
+              onChange={(e) => setCredentials({...credentials, password: e.target.value})}
+              placeholder="Heslo"
+              required
+              className="login-input"
+            />
+          </div>
+
+          <button type="submit" className="login-button">
+            Přihlásit se
+          </button>
+        </form>
+
+      </div>
     </div>
   );
 };

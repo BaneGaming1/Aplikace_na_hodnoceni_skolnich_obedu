@@ -8,14 +8,11 @@ import './App.css';
 const App = () => {
   return (
     <Router>
-      <div className="App">
-        <h1>Hodnocení školních obědů</h1>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/menu" element={<Menu />} />
-          <Route path="/rating" element={<Rating />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/menu" element={<Menu />} />
+        <Route path="/rating/:id" element={<Rating />} />
+      </Routes>
     </Router>
   );
 };
