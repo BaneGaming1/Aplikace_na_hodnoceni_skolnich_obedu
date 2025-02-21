@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+
 const Rating = () => {
   const params = useParams();
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const Rating = () => {
     cena: '',
     komentar: ''
   });
+  
 
   const handleSubmit = (e) => {
     e.preventDefault();
