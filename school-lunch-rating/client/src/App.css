@@ -69,6 +69,18 @@ body {
   padding: 2rem;
 }
 
+.day-block {
+  margin-bottom: 40px;
+}
+
+.day-heading {
+  font-size: 24px;
+  margin-bottom: 20px;
+  color: #333;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 10px;
+}
+
 .menu-title {
   font-size: 2rem;
   color: #1a1a1a;
@@ -81,6 +93,7 @@ body {
   align-items: center;
   margin-bottom: 2rem;
 }
+
 .meals-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -89,22 +102,53 @@ body {
 
 .meal-card {
   background: white;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s, box-shadow 0.2s;
+  padding: 20px;
+  border-radius: 8px;
 }
 
-.meal-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
+.meals-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.meal-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+
+.meal-card h3 {
+  color: #444;
+  margin: 0 0 10px 0;
+}
+
+.meal-card p {
+  margin: 0 0 15px 0;
+  color: #666;
+}
+
+.meal-card button {
+  width: 100%;
+  padding: 10px;
+  background: #0066FF;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+
+.meal-card button:hover {
+  background: #0052cc;
 }
 
 .placeholder-image {
   width: 100%;
-  height: 200px;
-  background: linear-gradient(45deg, #f3f4f6 25%, #e5e7eb 25%, #e5e7eb 50%, #f3f4f6 50%, #f3f4f6 75%, #e5e7eb 75%, #e5e7eb);
-  background-size: 20px 20px;
+  height: 160px;
+  background: #f0f0f0;
 }
 
 .menu-header h1 {
@@ -127,6 +171,14 @@ body {
   gap: 24px;
 }
 
+.meal-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
 .meal-card {
   background: white;
   border-radius: 12px;
@@ -145,10 +197,9 @@ body {
 }
 
 .meal-name {
-  font-size: 1.25rem;
-  color: #1a1a1a;
+  font-size: 1.1rem;
   margin: 0 0 1rem 0;
-  font-weight: 500;
+  line-height: 1.4;
 }
 
 .meal-content h3 {
@@ -157,19 +208,21 @@ body {
   color: var(--text-dark);
 }
 
-.star-rating {
-  color: #FFD700;
-  margin: 8px 0;
+.rating-stars {
+  color: #ffd700;
+  margin-bottom: 1rem;
 }
+
 
 .rate-button {
   width: 100%;
-  padding: 12px;
-  background-color: var(--primary-blue);
+  padding: 0.75rem;
+  background: #0066ff;
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
+  transition: background 0.2s;
 }
 
 /* Rating styles */
@@ -210,18 +263,6 @@ body {
   gap: 12px;
 }
 
-.rate-button {
-  width: 100%;
-  padding: 0.75rem;
-  background-color: grey;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
 
 .rating-option {
   padding: 8px 16px;
@@ -240,14 +281,6 @@ body {
   margin-top: 32px;
 }
 
-.rating-stars {
-  color: #FFD700;
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  display: flex;
-  gap: 4px;
-}
-
 .comment-section textarea {
   width: 100%;
   min-height: 100px;
@@ -256,3 +289,4 @@ body {
   border-radius: 8px;
   resize: vertical;
 }
+
