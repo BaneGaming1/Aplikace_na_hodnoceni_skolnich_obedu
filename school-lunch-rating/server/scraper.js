@@ -1,4 +1,3 @@
-// server/scraper.js
 const axios = require('axios');
 const cheerio = require('cheerio');
 
@@ -13,11 +12,8 @@ async function scrapeMeals() {
     const $ = cheerio.load(response.data);
     const days = {};
 
-    // Procházíme všechny dny
     $('.jidelnicekDen').each((i, dayElement) => {
-      // Získáme celý text s datem
       const dayTitle = $(dayElement).find('.jidelnicekTop.semibold').text().trim();
-      // Např.: "Jídelníček na 21.02.2025 - Pátek" -> "Pátek 21.02.2025"
       const parts = dayTitle.split('-');
       if (parts.length === 2) {
         const date = parts[0].split('na')[1].trim();
