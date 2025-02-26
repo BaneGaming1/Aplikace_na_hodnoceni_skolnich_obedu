@@ -18,7 +18,7 @@ const Menu = () => {
         console.error(err);
         setLoading(false);
       }
-    };
+    };+
 
     fetchMeals();
   }, []);
