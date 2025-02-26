@@ -1,5 +1,31 @@
+// server/scraper.js
 const axios = require('axios');
 const cheerio = require('cheerio');
+
+// Funkce pro získání názvu dne
+function getDayName(dayNumber) {
+  const days = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'];
+  return days[dayNumber];
+}
+
+// Funkce pro získání dnešního data a následujících pracovních dnů
+function getWorkDays() {
+  const days = [];
+  const today = new Date();
+  let currentDay = today;
+
+  while (days.length < 5) { // 5 pracovních dnů
+    const dayNumber = currentDay.getDay();
+    if (dayNumber !== 0 && dayNumber !== 6) { // Přeskočit víkendy
+      days.push({
+        date: new Date(currentDay),
+        dayName: getDayName(dayNumber)
+      });
+    }
+    currentDay.setDate(currentDay.getDate() + 1);
+  }
+  return days;
+}
 
 async function scrapeMeals() {
   try {
@@ -10,44 +36,39 @@ async function scrapeMeals() {
     });
 
     const $ = cheerio.load(response.data);
-    const days = {};
+    const menuData = {};
+    const workDays = getWorkDays();
 
-    $('.jidelnicekDen').each((i, dayElement) => {
-      const dayTitle = $(dayElement).find('.jidelnicekTop.semibold').text().trim();
-      const parts = dayTitle.split('-');
-      if (parts.length === 2) {
-        const date = parts[0].split('na')[1].trim();
-        const day = parts[1].trim();
-        const formattedDate = `${day} ${date}`;
-        const dayMeals = [];
+    // Najdeme jídla a přiřadíme je k pracovním dnům
+    $('.jidelnicekTop.semibold').each((i, element) => {
+      if (i < workDays.length) {
+        const dayInfo = workDays[i];
+        const meals = [];
 
-        $(dayElement).find('.container').each((j, element) => {
-          const typeElement = $(element).find('.smallBoldTitle');
-          const locationElement = $(element).find('.jidelnicekItem');
-          const nameElement = $(element).find('.column.jidelnicekItem');
-
-          if (locationElement.text().includes('Ječná')) {
-            const type = typeElement.text().trim();
-            const name = nameElement.text().trim();
-
-            if (type && name) {
-              dayMeals.push({
-                id: dayMeals.length + 1,
-                type: type,
-                name: name
-              });
-            }
+        $(element).parent().parent().find('tr').each((j, row) => {
+          const location = $(row).find('td').eq(2).text().trim();
+          if (location === 'Ječná') {
+            const type = $(row).find('td').eq(0).text().trim();
+            const name = $(row).find('td').eq(3).text().trim();
+            
+            meals.push({
+              id: meals.length + 1,
+              type: type,
+              name: name
+            });
           }
         });
 
-        if (dayMeals.length > 0) {
-          days[formattedDate] = dayMeals;
+        if (meals.length > 0) {
+          // Formát: "Pondělí 21.2."
+          const formattedDate = `${dayInfo.dayName} ${dayInfo.date.getDate()}.${dayInfo.date.getMonth() + 1}.`;
+          menuData[formattedDate] = meals;
         }
       }
     });
 
-    console.log('Scraper nalezl jídla po dnech:', days);
-    return days;
+    console.log('Nalezená data:', menuData);
+    return menuData;
   } catch (error) {
     console.error('Chyba při scrapování:', error);
     throw error;
