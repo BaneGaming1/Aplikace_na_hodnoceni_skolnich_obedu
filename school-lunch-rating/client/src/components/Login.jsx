@@ -77,11 +77,6 @@ const Login = () => {
           </button>
         </form>
 
-        <p className="login-info">
-          Pro testovací účely můžete použít jakýkoliv email a heslo.
-          <br />
-          V produkční verzi by zde byla integrace s Office 365.
-        </p>
       </div>
     </div>
   );
