@@ -4,111 +4,82 @@ const cheerio = require('cheerio');
 
 async function scrapeMeals() {
   try {
-    const response = await axios.get('https://strav.nasejidelna.cz/0341/login', {
+    console.log('Začínám načítat data z iCanteen...');
+    
+    // Vytvoříme prázdný objekt pro výsledky
+    const menuData = {};
+    
+    // Načteme stránku jídelníčku
+    const response = await axios.get('https://strav.nasejidelna.cz/0341/jidelnicek', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     });
-
+    
+    // Načteme HTML do cheerio
     const $ = cheerio.load(response.data);
-    const menuData = {};
-
-    // Procházíme každý den jídelníčku
+    
+    // Projdeme všechny dny v jídelníčku
     $('.jidelnicekDen').each((i, dayElement) => {
-      // Získáme datum z elementu
-      const dateText = $(dayElement).find('#day-2025-02-26').text().trim() || 
-                       $(dayElement).find('.jidelnicekTop.semibold').text().trim();
+      // Získáme datum dne
+      const dateText = $(dayElement).find('.jidelnicekTop.semibold').text().trim();
       if (!dateText) return;
-
-      // Najdeme všechna jídla v daném dni
-      const meals = [];
-      $(dayElement).find('.column.jidelnicekItem').each((j, mealElement) => {
-        // Najdeme typ jídla (Oběd 1/Oběd 2)
-        const typeElement = $(mealElement).prevAll('.smallBoldTitle').first();
-        const type = typeElement.text().trim();
-
-        // Najdeme název jídla
-        const name = $(mealElement).text().trim();
-
-        // Zkontrolujeme, že máme všechna data
-        if (type && name) {
-          meals.push({
-            id: meals.length + 1,
-            type: type,
-            name: name
+      
+      // Vytvoříme pole pro jídla tohoto dne
+      const dailyMeals = [];
+      
+      // Projdeme všechny řádky v tomto dni
+      $(dayElement).find('tr').each((j, row) => {
+        const rowText = $(row).text().trim();
+        
+        // Kontrola, zda řádek obsahuje "Ječná"
+        if (rowText.includes('Ječná')) {
+          // Najdeme všechny buňky v řádku
+          const cells = $(row).find('td');
+          
+          let mealType = '';
+          let mealName = '';
+          
+          // První buňka obvykle obsahuje typ jídla (Oběd 1, Oběd 2)
+          if (cells.length > 0) {
+            mealType = $(cells[0]).text().trim();
+          }
+          
+          // Najdeme buňku s nejdelším textem, to bude pravděpodobně název jídla
+          let maxLength = 0;
+          cells.each((k, cell) => {
+            const cellText = $(cell).text().trim();
+            if (cellText.length > maxLength && !cellText.includes('Ječná') && cellText !== mealType) {
+              maxLength = cellText.length;
+              mealName = cellText;
+            }
           });
+          
+          // Přidáme jídlo do pole, pokud máme všechny údaje
+          if (mealType && mealName && mealType.includes('Oběd')) {
+            dailyMeals.push({
+              id: dailyMeals.length + 1,
+              type: mealType,
+              name: mealName
+            });
+          }
         }
       });
-
-      // Pokud máme jídla, přidáme je do výsledku
-      if (meals.length > 0) {
-        menuData[dateText] = meals;
+      
+      // Přidáme jídla do výsledku, pokud nějaká máme
+      if (dailyMeals.length > 0) {
+        menuData[dateText] = dailyMeals;
       }
     });
-
+    
     console.log('Nalezená data:', menuData);
     
-    // Pokud nemáme žádná data, použijeme testovací data
-    if (Object.keys(menuData).length === 0) {
-      return {
-        "Středa 26.02.2025": [
-          {
-            id: 1,
-            type: "Oběd 1",
-            name: "Hovězí vývar s fridátovými nudlemi, Šunkofleky, okurkový salát, vitamínový nápoj"
-          },
-          {
-            id: 2,
-            type: "Oběd 2",
-            name: "Hovězí vývar s fridátovými nudlemi, Bezmasá čína, rýžové nudle, vitamínový nápoj"
-          }
-        ],
-        "Čtvrtek 27.02.2025": [
-          {
-            id: 3,
-            type: "Oběd 1",
-            name: "Polévka z míchaných luštěnin, Vepřový guláš, tarhoňa, čaj s citronem"
-          },
-          {
-            id: 4,
-            type: "Oběd 2",
-            name: "Polévka z míchaných luštěnin, Květákový mozeček, brambory, rajčatový salát, čaj s citronem"
-          }
-        ]
-      };
-    }
-    
+    // Vrátíme nalezená data
     return menuData;
   } catch (error) {
-    console.error('Chyba při scrapování:', error);
-    
-    // Vrátit testovací data v případě chyby
-    return {
-      "Středa 26.02.2025": [
-        {
-          id: 1,
-          type: "Oběd 1",
-          name: "Hovězí vývar s fridátovými nudlemi, Šunkofleky, okurkový salát, vitamínový nápoj"
-        },
-        {
-          id: 2,
-          type: "Oběd 2",
-          name: "Hovězí vývar s fridátovými nudlemi, Bezmasá čína, rýžové nudle, vitamínový nápoj"
-        }
-      ],
-      "Čtvrtek 27.02.2025": [
-        {
-          id: 3,
-          type: "Oběd 1",
-          name: "Polévka z míchaných luštěnin, Vepřový guláš, tarhoňa, čaj s citronem"
-        },
-        {
-          id: 4,
-          type: "Oběd 2",
-          name: "Polévka z míchaných luštěnin, Květákový mozeček, brambory, rajčatový salát, čaj s citronem"
-        }
-      ]
-    };
+    console.error('Chyba při načítání dat:', error);
+    // V případě chyby vrátíme prázdný objekt
+    return {};
   }
 }
 
