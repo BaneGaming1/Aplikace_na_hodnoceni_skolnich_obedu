@@ -4,81 +4,127 @@ const cheerio = require('cheerio');
 
 async function scrapeMeals() {
   try {
-    console.log('Začínám načítat data z iCanteen...');
-    
-    // Vytvoříme prázdný objekt pro výsledky
-    const menuData = {};
-    
-    // Načteme stránku jídelníčku
-    const response = await axios.get('https://strav.nasejidelna.cz/0341/jidelnicek', {
+    console.log('Začínám scrapování přes přihlašovací stránku...');
+    const response = await axios.get('https://strav.nasejidelna.cz/0341/login', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     });
-    
-    // Načteme HTML do cheerio
+
     const $ = cheerio.load(response.data);
-    
-    // Projdeme všechny dny v jídelníčku
+    const menuData = {};
+
+    // Procházíme každý den jídelníčku
     $('.jidelnicekDen').each((i, dayElement) => {
-      // Získáme datum dne
+      // Získáme datum z elementu
       const dateText = $(dayElement).find('.jidelnicekTop.semibold').text().trim();
       if (!dateText) return;
       
-      // Vytvoříme pole pro jídla tohoto dne
-      const dailyMeals = [];
+      console.log(`Nalezeno datum: ${dateText}`);
+
+      // Najdeme všechna jídla v daném dni
+      const meals = [];
+      $(dayElement).find('.column.jidelnicekItem').each((j, mealElement) => {
+        // Najdeme typ jídla (Oběd 1/Oběd 2)
+        const typeElement = $(mealElement).prevAll('.smallBoldTitle').first();
+        const type = typeElement.text().trim();
+
+        // Najdeme název jídla
+        const name = $(mealElement).text().trim();
+
+        // Zkontrolujeme, že máme všechna data
+        if (type && name) {
+          console.log(`Nalezeno jídlo: ${type} - ${name}`);
+          meals.push({
+            id: meals.length + 1,
+            type: type,
+            name: name
+          });
+        }
+      });
+
+      // Pokud máme jídla, přidáme je do výsledku
+      if (meals.length > 0) {
+        menuData[dateText] = meals;
+      }
+    });
+
+    console.log('Nalezená data:', menuData);
+    
+    if (Object.keys(menuData).length === 0) {
+      console.log('Zkouším alternativní způsob hledání jídel...');
       
-      // Projdeme všechny řádky v tomto dni
-      $(dayElement).find('tr').each((j, row) => {
+      // Hledáme řádky, které obsahují informace o jídle
+      $('tr').each((i, row) => {
         const rowText = $(row).text().trim();
-        
-        // Kontrola, zda řádek obsahuje "Ječná"
-        if (rowText.includes('Ječná')) {
-          // Najdeme všechny buňky v řádku
-          const cells = $(row).find('td');
+        // Zkontrolujeme, zda řádek obsahuje "Oběd"
+        if (rowText.includes('Oběd')) {
+          console.log(`Nalezen řádek s obědem: ${rowText.substring(0, 50)}...`);
           
-          let mealType = '';
-          let mealName = '';
+          // Pokusíme se najít datum
+          let dateText = '';
+          let currentElement = $(row);
+          let found = false;
           
-          // První buňka obvykle obsahuje typ jídla (Oběd 1, Oběd 2)
-          if (cells.length > 0) {
-            mealType = $(cells[0]).text().trim();
+          // Zkusíme najít datum v předchozích elementech
+          for (let k = 0; k < 5; k++) {
+            currentElement = currentElement.prev();
+            if (currentElement.length && currentElement.text().includes('.202')) {
+              dateText = currentElement.text().trim();
+              found = true;
+              break;
+            }
           }
           
-          // Najdeme buňku s nejdelším textem, to bude pravděpodobně název jídla
-          let maxLength = 0;
-          cells.each((k, cell) => {
-            const cellText = $(cell).text().trim();
-            if (cellText.length > maxLength && !cellText.includes('Ječná') && cellText !== mealType) {
-              maxLength = cellText.length;
-              mealName = cellText;
+          // Pokud jsme nenašli datum, zkusíme ho najít v nadřazených elementech
+          if (!found) {
+            currentElement = $(row).parent().parent();
+            if (currentElement.length && currentElement.find('h2, h3, div.jidelnicekTop').length) {
+              dateText = currentElement.find('h2, h3, div.jidelnicekTop').first().text().trim();
             }
-          });
+          }
           
-          // Přidáme jídlo do pole, pokud máme všechny údaje
-          if (mealType && mealName && mealType.includes('Oběd')) {
-            dailyMeals.push({
-              id: dailyMeals.length + 1,
-              type: mealType,
-              name: mealName
-            });
+          if (dateText) {
+            console.log(`Datum pro tento řádek: ${dateText}`);
+            
+            // Extrahujeme typ jídla a název
+            const cells = $(row).find('td');
+            if (cells.length >= 2) {
+              const type = cells.first().text().trim();
+              let name = '';
+              
+              // Projdeme všechny buňky a najdeme tu, která obsahuje nejdelší text
+              cells.each((j, cell) => {
+                const cellText = $(cell).text().trim();
+                if (cellText.length > name.length && cellText !== type) {
+                  name = cellText;
+                }
+              });
+              
+              if (type && name && type.includes('Oběd')) {
+                console.log(`Extrahováno jídlo: ${type} - ${name}`);
+                
+                // Přidáme jídlo do výsledku
+                if (!menuData[dateText]) {
+                  menuData[dateText] = [];
+                }
+                
+                menuData[dateText].push({
+                  id: menuData[dateText].length + 1,
+                  type: type,
+                  name: name
+                });
+              }
+            }
           }
         }
       });
-      
-      // Přidáme jídla do výsledku, pokud nějaká máme
-      if (dailyMeals.length > 0) {
-        menuData[dateText] = dailyMeals;
-      }
-    });
+    }
     
-    console.log('Nalezená data:', menuData);
-    
-    // Vrátíme nalezená data
+    console.log('Konečná data:', menuData);
     return menuData;
   } catch (error) {
-    console.error('Chyba při načítání dat:', error);
-    // V případě chyby vrátíme prázdný objekt
+    console.error('Chyba při scrapování:', error);
     return {};
   }
 }

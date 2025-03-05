@@ -20,36 +20,14 @@ app.use(express.json());
 testConnection();
 
 // Endpoint pro získání jídel
-// server/index.js - upravená verze endpointu pro jídla
+// Endpoint pro získání jídel - pouze scrapování, žádné ukládání do databáze
 app.get('/api/meals', async (req, res) => {
   try {
-    // Místo scrapování jídel je načteme přímo z databáze
-    const [rows] = await pool.query(
-      'SELECT id, DATE_FORMAT(date, "%d.%m.%Y") as date_formatted, meal_type, name FROM meals ORDER BY date, id'
-    );
+    // Získáme data přímo ze scraperu
+    const meals = await scrapeMeals();
     
-    // Zpracujeme data do požadovaného formátu
-    const menuData = {};
-    
-    rows.forEach(row => {
-      // Formátovaný datum jako klíč
-      const dateKey = row.date_formatted;
-      
-      // Pokud tento den ještě nemáme, vytvoříme pro něj pole
-      if (!menuData[dateKey]) {
-        menuData[dateKey] = [];
-      }
-      
-      // Přidáme jídlo do pole pro tento den
-      menuData[dateKey].push({
-        id: row.id,
-        type: row.meal_type,
-        name: row.name
-      });
-    });
-    
-    // Vrátíme data
-    res.json(menuData);
+    // Vracíme data klientovi
+    res.json(meals);
   } catch (error) {
     console.error('Chyba při získávání dat:', error);
     res.status(500).json({ error: 'Chyba serveru při načítání dat' });
