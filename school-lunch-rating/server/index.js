@@ -20,21 +20,37 @@ app.use(express.json());
 testConnection();
 
 // Endpoint pro získání jídel
-// Endpoint pro získání jídel - pouze scrapování, žádné ukládání do databáze
 app.get('/api/meals', async (req, res) => {
   try {
     // Získáme data přímo ze scraperu
     const meals = await scrapeMeals();
     
+    // Přidáme unikátní ID pro jednotlivé dny a jídla, pokud ještě nemají
+    // Tímto zajistíme, že každé jídlo bude mít své jedinečné ID
+    let runningId = 1;
+    const enrichedData = {};
+    
+    Object.keys(meals).forEach(dateKey => {
+      enrichedData[dateKey] = meals[dateKey].map(meal => {
+        if (!meal.id) {
+          // Pokud nemá ID, přidáme ho
+          meal.id = runningId++;
+        }
+        return meal;
+      });
+    });
+    
+    // Logujeme data pro debugování
+    console.log('Obohacená jídla:', enrichedData);
+    
     // Vracíme data klientovi
-    res.json(meals);
+    res.json(enrichedData);
   } catch (error) {
     console.error('Chyba při získávání dat:', error);
     res.status(500).json({ error: 'Chyba serveru při načítání dat' });
   }
 });
 
-// Přihlášení uživatele
 // Přihlášení uživatele
 app.post('/api/login', async (req, res) => {
   try {
@@ -43,6 +59,11 @@ app.post('/api/login', async (req, res) => {
     // Jednoduchá validace, že email má správný formát
     if (!email || !email.includes('@')) {
       return res.status(401).json({ error: 'Zadejte platný email' });
+    }
+    
+    // Kontrola, zda je doména spsejecna.cz
+    if (!email.endsWith('@spsejecna.cz')) {
+      return res.status(401).json({ error: 'Musíte použít školní email (@spsejecna.cz)' });
     }
     
     // Kontrola, zda uživatel existuje
@@ -65,7 +86,7 @@ app.post('/api/login', async (req, res) => {
       userId = users[0].id;
     }
     
-    res.json({ success: true, userId });
+    res.json({ success: true, userId, email });
   } catch (error) {
     console.error('Chyba při přihlašování:', error);
     res.status(500).json({ error: 'Chyba serveru při přihlašování' });
@@ -73,7 +94,6 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Přidání hodnocení
-// Přidání hodnocení - opravená verze s převedením ID na číslo
 app.post('/api/ratings', async (req, res) => {
   try {
     const { mealId, userId, taste, appearance, temperature, portionSize, price, comment } = req.body;
@@ -90,121 +110,54 @@ app.post('/api/ratings', async (req, res) => {
     });
     
     // Převedeme ID na čísla, pokud jsou poskytnuty jako řetězce
-    const numericMealId = Number(mealId.replace(/[^0-9]/g, '')) || 1;
-    const numericUserId = Number(userId) || 1;
+    const numericMealId = Number(mealId);
+    const numericUserId = Number(userId);
     
-    console.log('Převedená ID:', { numericMealId, numericUserId });
+    // Pro day_meal_type_id použijeme kombinaci userId_mealId
+    // Toto zaručuje že každý uživatel může hodnotit každé jídlo pouze jednou
+    const dayMealTypeId = `${numericUserId}_${numericMealId}`;
     
-    // Kontrola, zda už toto hodnocení neexistuje
+    console.log('Generovaný day_meal_type_id:', dayMealTypeId);
+    
+    // Kontrola, zda uživatel již hodnotil toto konkrétní jídlo
     const [existingRatings] = await pool.query(
-      'SELECT id FROM ratings WHERE meal_id = ? AND user_id = ?',
-      [numericMealId, numericUserId]
+      'SELECT id FROM ratings WHERE user_id = ? AND meal_id = ?',
+      [numericUserId, numericMealId]
     );
     
-    if (existingRatings && existingRatings.length > 0) {
-      return res.status(400).json({ error: 'Toto jídlo jste již hodnotili' });
+    if (existingRatings.length > 0) {
+      return res.status(400).json({ 
+        error: 'Toto jídlo jste již hodnotili'
+      });
     }
     
-    // Kontrola, zda jídlo existuje, a pokud ne, vytvoříme ho
+    // Kontrola, zda jídlo existuje v databázi
     const [existingMeals] = await pool.query(
-      'SELECT id FROM meals WHERE id = ?',
+      'SELECT * FROM meals WHERE id = ?',
       [numericMealId]
     );
     
     // Pokud jídlo neexistuje, vytvoříme ho
     if (existingMeals.length === 0) {
-      // Používáme číslo ID
+      // Určíme typ jídla podle ID (lichá = Oběd 1, sudá = Oběd 2)
+      const mealType = numericMealId % 2 === 0 ? 'Oběd 2' : 'Oběd 1';
+      
       await pool.query(
         'INSERT INTO meals (id, date, meal_type, name) VALUES (?, CURDATE(), ?, ?)',
-        [numericMealId, 'Oběd', 'Jídlo z jídelníčku']
+        [numericMealId, mealType, 'Jídlo z jídelníčku']
       );
     }
     
-    // Kontrola, zda uživatel existuje
-    const [existingUsers] = await pool.query(
-      'SELECT id FROM users WHERE id = ?',
-      [numericUserId]
-    );
-    
-    // Pokud uživatel neexistuje, vytvoříme ho
-    if (existingUsers.length === 0) {
-      await pool.query(
-        'INSERT INTO users (id, email, password) VALUES (?, ?, ?)',
-        [numericUserId, `user${numericUserId}@example.com`, 'password123']
-      );
-    }
-    
-    // Přidání hodnocení
+    // Vložení hodnocení do databáze
     await pool.query(
-      'INSERT INTO ratings (meal_id, user_id, taste, appearance, temperature, portion_size, price, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [numericMealId, numericUserId, taste, appearance, temperature, portionSize, price, comment]
+      'INSERT INTO ratings (meal_id, user_id, day_meal_type_id, taste, appearance, temperature, portion_size, price, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [numericMealId, numericUserId, dayMealTypeId, taste, appearance, temperature, portionSize, price, comment || '']
     );
     
     res.json({ success: true });
   } catch (error) {
-    console.error('Chyba při hodnocení:', error);
-    res.status(500).json({ 
-      error: 'Chyba serveru při ukládání hodnocení: ' + error.message,
-      details: error.toString()
-    });
-  }
-});
-
-// Získání hodnocení pro konkrétní jídlo
-app.get('/api/ratings/:mealId', async (req, res) => {
-  try {
-    const mealId = req.params.mealId;
-    
-    // Získání všech hodnocení pro dané jídlo
-    const [ratings] = await pool.query(
-      'SELECT * FROM ratings WHERE meal_id = ?',
-      [mealId]
-    );
-    
-    res.json(ratings);
-  } catch (error) {
-    console.error('Chyba při získávání hodnocení:', error);
-    res.status(500).json({ error: 'Chyba serveru při načítání hodnocení' });
-  }
-});
-
-// Kontrola, zda uživatel již hodnotil dané jídlo
-app.get('/api/ratings/check/:mealId/:userId', async (req, res) => {
-  try {
-    const { mealId, userId } = req.params;
-    
-    const [ratings] = await pool.query(
-      'SELECT id FROM ratings WHERE meal_id = ? AND user_id = ?',
-      [mealId, userId]
-    );
-    
-    res.json({ hasRated: ratings.length > 0 });
-  } catch (error) {
     console.error('Chyba při kontrole hodnocení:', error);
     res.status(500).json({ error: 'Chyba serveru při kontrole hodnocení' });
-  }
-});
-
-// Získání databázových ID jídel
-app.get('/api/meals/db-ids', async (req, res) => {
-  try {
-    // Získáme všechna jídla z databáze, řazena podle nejnovějších
-    const [rows] = await pool.query(
-      'SELECT id, date, meal_type, name FROM meals ORDER BY date DESC, id DESC'
-    );
-    
-    // Zajistíme, že formát data je konzistentní v odpovědi
-    const formattedRows = rows.map(row => ({
-      ...row,
-      date: row.date instanceof Date ? 
-        row.date.toISOString().split('T')[0] : 
-        row.date
-    }));
-    
-    res.json(formattedRows);
-  } catch (error) {
-    console.error('Chyba při získávání ID jídel:', error);
-    res.status(500).json({ error: 'Chyba serveru při načítání dat jídel' });
   }
 });
 

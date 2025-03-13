@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -11,22 +11,35 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Kontrola přihlášení při načtení komponenty
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+      navigate('/menu');
+    }
+  }, [navigate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     
     try {
+      console.log('Odesílám přihlašovací údaje:', credentials);
+      
       const response = await axios.post('http://localhost:5000/api/login', credentials);
       
+      console.log('Odpověď serveru:', response.data);
+      
       if (response.data.success) {
-        // Uložíme ID uživatele do localStorage pro další použití
+        // Uložíme ID uživatele a email do localStorage
         localStorage.setItem('userId', response.data.userId);
         localStorage.setItem('userEmail', credentials.email);
         navigate('/menu');
       }
     } catch (error) {
       console.error('Chyba při přihlašování:', error);
+      
       if (error.response && error.response.data && error.response.data.error) {
         setError(error.response.data.error);
       } else {
@@ -51,7 +64,7 @@ const Login = () => {
               type="email"
               value={credentials.email}
               onChange={(e) => setCredentials({...credentials, email: e.target.value})}
-              placeholder="Školní email"
+              placeholder="Email"
               required
               className="login-input"
             />
@@ -76,7 +89,6 @@ const Login = () => {
             {loading ? 'Přihlašování...' : 'Přihlásit se'}
           </button>
         </form>
-
       </div>
     </div>
   );

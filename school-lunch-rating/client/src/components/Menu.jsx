@@ -96,7 +96,6 @@ const Menu = () => {
     }
     
     // Seřadíme podle vzdálenosti od dnešního dne
-    // Dnešek (0) na začátek, následující dny (1, 2, 3...) po něm, předchozí dny (-1, -2...) na konec
     dateArray.sort((a, b) => {
       // Přednostně řadíme podle toho, jestli je datum dnes, v budoucnu nebo v minulosti
       if ((a.diffDays >= 0 && b.diffDays >= 0) || (a.diffDays < 0 && b.diffDays < 0)) {
@@ -154,40 +153,47 @@ const Menu = () => {
   }
 
   return (
-    <div className="menu-page">
-      <div className="menu-header">
-        <h1>Jídelníček</h1>
-        <div className="user-info">
-          <p>Přihlášen jako: {localStorage.getItem('userEmail') || 'D@D'}</p>
+    <div>
+      <header className="header">
+        <h1 className="logo">Jídelníček</h1>
+        <div className="user-panel">
+          <div className="user-info">
+            Přihlášen jako: {localStorage.getItem('userEmail') || 'D@D'}
+          </div>
           <button onClick={handleLogout} className="logout-button">
             Odhlásit se
           </button>
         </div>
-      </div>
+      </header>
 
-      {Object.entries(menuData).map(([dayTitle, meals]) => {
-        return (
-          <div key={dayTitle} className="day-block">
-            <h2 className="day-heading">{dayTitle}</h2>
-            <div className="meals-list">
+      <div className="container">
+        {Object.entries(menuData).map(([dateText, meals], dayIndex) => (
+          <div key={dateText}>
+            {dayIndex > 0 && <div className="day-separator"></div>}
+            <h2 className="day-title">{dateText}</h2>
+            <div className="meals-container">
               {meals.map((meal) => (
                 <div key={meal.id} className="meal-card">
-                  <h3>{meal.type}</h3>
-                  <p className="meal-name">{meal.name}</p>
-                  <button
-                    className="rate-button"
-                    onClick={() => navigate(`/rating/${meal.id}`, { 
-                      state: { meal, dayTitle } 
-                    })}
-                  >
-                    Ohodnotit
-                  </button>
+                  <div className="meal-header">
+                    <h3>{meal.type}</h3>
+                  </div>
+                  <div className="meal-content">
+                    <p className="meal-description">{meal.name}</p>
+                    <button
+                      className="rate-button"
+                      onClick={() => navigate(`/rating/${meal.id}`, { 
+                        state: { meal, dayTitle: dateText } 
+                      })}
+                    >
+                      Ohodnotit
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 };

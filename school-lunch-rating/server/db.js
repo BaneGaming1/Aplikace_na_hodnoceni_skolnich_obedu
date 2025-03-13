@@ -3,9 +3,10 @@ const mysql = require('mysql2/promise');
 
 const pool = mysql.createPool({
   host: 'thastertyn.xyz',
-  user: 'eshop_user',  // Upravte podle vašeho nastavení
-  password: 'sivek1234',  // Upravte podle vašeho nastavení
-  database: 'eshop'
+  user: 'sivek',  
+  password: 'sivek1234', 
+  database: 'sys',
+  port: 56969
 });
 
 // Test připojení
