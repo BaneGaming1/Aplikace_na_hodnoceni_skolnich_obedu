@@ -86,11 +86,18 @@ const Menu = () => {
         const diffTime = date.getTime() - today.getTime();
         const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
         
+        // Vytvoříme kód data pro pozdější použití v ID
+        const dateCode = `${year}${String(month + 1).padStart(2, '0')}${String(day).padStart(2, '0')}`;
+        
         dateArray.push({
           dateText,
           date,
           diffDays,
-          meals: data[dateText]
+          dateCode,
+          meals: data[dateText].map(meal => ({
+            ...meal,
+            uniqueId: `${dateCode}_${meal.id}`
+          }))
         });
       }
     }
@@ -167,32 +174,48 @@ const Menu = () => {
       </header>
 
       <div className="container">
-        {Object.entries(menuData).map(([dateText, meals], dayIndex) => (
-          <div key={dateText}>
-            {dayIndex > 0 && <div className="day-separator"></div>}
-            <h2 className="day-title">{dateText}</h2>
-            <div className="meals-container">
-              {meals.map((meal) => (
-                <div key={meal.id} className="meal-card">
-                  <div className="meal-header">
-                    <h3>{meal.type}</h3>
+        {Object.entries(menuData).map(([dateText, meals], dayIndex) => {
+          // Vytvoříme kód data pro ID
+          const dateMatch = dateText.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+          let dateCode = '';
+          if (dateMatch) {
+            const day = String(dateMatch[1]).padStart(2, '0');
+            const month = String(dateMatch[2]).padStart(2, '0');
+            const year = dateMatch[3];
+            dateCode = `${year}${month}${day}`;
+          }
+          
+          return (
+            <div key={dateText}>
+              {dayIndex > 0 && <div className="day-separator"></div>}
+              <h2 className="day-title">{dateText}</h2>
+              <div className="meals-container">
+                {meals.map((meal) => (
+                  <div key={meal.id} className="meal-card">
+                    <div className="meal-header">
+                      <h3>{meal.type}</h3>
+                    </div>
+                    <div className="meal-content">
+                      <p className="meal-description">{meal.name}</p>
+                      <button
+                        className="rate-button"
+                        onClick={() => {
+                          // Použijeme unikátní ID které obsahuje datum
+                          const uniqueId = `${dateCode}_${meal.id}`;
+                          navigate(`/rating/${uniqueId}`, { 
+                            state: { meal: {...meal, id: uniqueId}, dayTitle: dateText } 
+                          });
+                        }}
+                      >
+                        Ohodnotit
+                      </button>
+                    </div>
                   </div>
-                  <div className="meal-content">
-                    <p className="meal-description">{meal.name}</p>
-                    <button
-                      className="rate-button"
-                      onClick={() => navigate(`/rating/${meal.id}`, { 
-                        state: { meal, dayTitle: dateText } 
-                      })}
-                    >
-                      Ohodnotit
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

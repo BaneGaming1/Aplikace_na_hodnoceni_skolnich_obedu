@@ -31,11 +31,26 @@ app.get('/api/meals', async (req, res) => {
     const enrichedData = {};
     
     Object.keys(meals).forEach(dateKey => {
+      // Extrahujeme datum z klíče pro pozdější použití v ID
+      const dateMatch = dateKey.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+      let dateCode = '';
+      if (dateMatch) {
+        // Formát: YYYYMMDD
+        const day = String(dateMatch[1]).padStart(2, '0');
+        const month = String(dateMatch[2]).padStart(2, '0');
+        const year = dateMatch[3];
+        dateCode = `${year}${month}${day}`;
+      }
+      
       enrichedData[dateKey] = meals[dateKey].map(meal => {
         if (!meal.id) {
           // Pokud nemá ID, přidáme ho
           meal.id = runningId++;
         }
+        
+        // Přidáme datum k ID pro unikátnost mezi dny
+        meal.uniqueId = `${dateCode}_${meal.id}`;
+        
         return meal;
       });
     });
@@ -109,25 +124,55 @@ app.post('/api/ratings', async (req, res) => {
       comment
     });
     
-    // Převedeme ID na čísla, pokud jsou poskytnuty jako řetězce
-    const numericMealId = Number(mealId);
-    const numericUserId = Number(userId);
+    if (!mealId || !userId) {
+      console.error('Chybí mealId nebo userId');
+      return res.status(400).json({ error: 'Chybí povinné parametry' });
+    }
     
-    // Pro day_meal_type_id použijeme kombinaci userId_mealId
-    // Toto zaručuje že každý uživatel může hodnotit každé jídlo pouze jednou
-    const dayMealTypeId = `${numericUserId}_${numericMealId}`;
+    // Převedeme ID uživatele na číslo
+    const numericUserId = parseInt(userId, 10);
+    if (isNaN(numericUserId)) {
+      console.error(`Neplatné ID uživatele: ${userId}`);
+      return res.status(400).json({ error: 'Neplatné ID uživatele' });
+    }
     
+    // Extrahujeme datum a ID jídla z mealId
+    let numericMealId;
+    let dateCode = '';
+    
+    const idParts = String(mealId).split('_');
+    if (idParts.length > 1) {
+      // Formát je YYYYMMDD_id
+      dateCode = idParts[0];
+      numericMealId = parseInt(idParts[1], 10);
+    } else {
+      // Pokud nemá složený formát, zkusíme přímo převést na číslo
+      numericMealId = parseInt(mealId, 10);
+      
+      // Získáme aktuální datum jako záložní řešení
+      const today = new Date();
+      dateCode = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+    }
+    
+    // Kontrola platnosti ID jídla
+    if (isNaN(numericMealId)) {
+      console.error(`Neplatné ID jídla: ${mealId}`);
+      return res.status(400).json({ error: 'Neplatné ID jídla' });
+    }
+    
+    // Vytvoříme unikátní identifikátor pro kombinaci uživatel-datum-jídlo
+    const dayMealTypeId = `${numericUserId}_${dateCode}_${numericMealId}`;
     console.log('Generovaný day_meal_type_id:', dayMealTypeId);
     
-    // Kontrola, zda uživatel již hodnotil toto konkrétní jídlo
+    // Kontrola, zda uživatel již hodnotil toto jídlo v tento den
     const [existingRatings] = await pool.query(
-      'SELECT id FROM ratings WHERE user_id = ? AND meal_id = ?',
-      [numericUserId, numericMealId]
+      'SELECT id FROM ratings WHERE day_meal_type_id = ?',
+      [dayMealTypeId]
     );
     
     if (existingRatings.length > 0) {
       return res.status(400).json({ 
-        error: 'Toto jídlo jste již hodnotili'
+        error: 'Toto jídlo jste již pro tento den hodnotili'
       });
     }
     
@@ -156,8 +201,172 @@ app.post('/api/ratings', async (req, res) => {
     
     res.json({ success: true });
   } catch (error) {
+    console.error('Chyba při hodnocení:', error);
+    res.status(500).json({ 
+      error: 'Chyba serveru při kontrole hodnocení', 
+      details: error.message 
+    });
+  }
+});
+
+// Kontrola, zda uživatel již hodnotil dané jídlo
+app.get('/api/ratings/check/:mealId/:userId', async (req, res) => {
+  try {
+    const { mealId, userId } = req.params;
+    
+    console.log(`Kontroluji hodnocení pro mealId: ${mealId}, userId: ${userId}`);
+    
+    // Nejprve zkontrolujeme, zda máme platná data
+    if (!mealId || !userId) {
+      console.error('Chybí mealId nebo userId');
+      return res.status(400).json({ error: 'Chybí povinné parametry' });
+    }
+    
+    // Extrahujeme části z mealId, pokud obsahuje formát date_id
+    const idParts = mealId.toString().split('_');
+    
+    // Použijeme try-catch pro případ, že by došlo k chybě při konverzi na číslo
+    try {
+      // Kontrola pomocí dayMealTypeId (preferovaný způsob)
+      if (idParts.length > 1) {
+        // Je ve formátu datum_id
+        const dateCode = idParts[0];
+        const numericId = parseInt(idParts[1], 10);
+        
+        if (isNaN(numericId)) {
+          console.error(`Neplatné ID jídla: ${mealId}`);
+          return res.status(400).json({ error: 'Neplatné ID jídla' });
+        }
+        
+        const dayMealTypeId = `${userId}_${dateCode}_${numericId}`;
+        console.log('Kontrola day_meal_type_id:', dayMealTypeId);
+        
+        const [ratings] = await pool.query(
+          'SELECT id FROM ratings WHERE day_meal_type_id = ?',
+          [dayMealTypeId]
+        );
+        
+        return res.json({ hasRated: ratings.length > 0 });
+      } else {
+        // Nemá složený formát, zkusíme starou metodu kontroly
+        const numericMealId = parseInt(mealId, 10);
+        const numericUserId = parseInt(userId, 10);
+        
+        if (isNaN(numericMealId) || isNaN(numericUserId)) {
+          console.error(`Neplatná ID: mealId=${mealId}, userId=${userId}`);
+          return res.status(400).json({ error: 'Neplatná ID' });
+        }
+        
+        console.log(`Záložní kontrola: mealId=${numericMealId}, userId=${numericUserId}`);
+        
+        const [ratings] = await pool.query(
+          'SELECT id FROM ratings WHERE meal_id = ? AND user_id = ?',
+          [numericMealId, numericUserId]
+        );
+        
+        return res.json({ hasRated: ratings.length > 0 });
+      }
+    } catch (err) {
+      console.error('Chyba při parsování ID:', err);
+      return res.status(400).json({ error: 'Chyba formátu ID' });
+    }
+  } catch (error) {
     console.error('Chyba při kontrole hodnocení:', error);
     res.status(500).json({ error: 'Chyba serveru při kontrole hodnocení' });
+  }
+});
+
+// Získání hodnocení pro konkrétní jídlo
+app.get('/api/ratings/:mealId', async (req, res) => {
+  try {
+    const mealId = req.params.mealId;
+    
+    // Extrahujeme číslo ID, pokud má formát date_id
+    let numericMealId;
+    const idParts = mealId.toString().split('_');
+    if (idParts.length > 1) {
+      numericMealId = Number(idParts[1]);
+    } else {
+      numericMealId = Number(mealId);
+    }
+    
+    // Získání všech hodnocení pro dané jídlo
+    const [ratings] = await pool.query(
+      'SELECT * FROM ratings WHERE meal_id = ?',
+      [numericMealId]
+    );
+    
+    res.json(ratings);
+  } catch (error) {
+    console.error('Chyba při získávání hodnocení:', error);
+    res.status(500).json({ error: 'Chyba serveru při načítání hodnocení' });
+  }
+});
+
+// Endpoint pro statistiky hodnocení
+app.get('/api/statistics', async (req, res) => {
+  try {
+    // Získáme statistiky podle různých kritérií
+    
+    // 1. Průměrné hodnocení chuti podle typu jídla
+    const [tasteStats] = await pool.query(`
+      SELECT m.meal_type, 
+             AVG(CASE WHEN r.taste = 'vyborny' THEN 3 WHEN r.taste = 'prijatelne' THEN 2 ELSE 1 END) as avg_taste,
+             COUNT(r.id) as count
+      FROM ratings r
+      JOIN meals m ON r.meal_id = m.id
+      GROUP BY m.meal_type
+    `);
+    
+    // 2. Rozložení hodnocení velikosti porcí
+    const [portionStats] = await pool.query(`
+      SELECT portion_size, COUNT(*) as count
+      FROM ratings
+      GROUP BY portion_size
+    `);
+    
+    // 3. Rozložení hodnocení teploty jídla
+    const [temperatureStats] = await pool.query(`
+      SELECT temperature, COUNT(*) as count
+      FROM ratings
+      GROUP BY temperature
+    `);
+    
+    // 4. Nejlépe a nejhůře hodnocená jídla
+    const [topMeals] = await pool.query(`
+      SELECT m.name, m.meal_type, 
+             AVG(CASE WHEN r.taste = 'vyborny' THEN 3 WHEN r.taste = 'prijatelne' THEN 2 ELSE 1 END) as score,
+             COUNT(r.id) as count
+      FROM ratings r
+      JOIN meals m ON r.meal_id = m.id
+      GROUP BY m.id, m.name, m.meal_type
+      HAVING count >= 5
+      ORDER BY score DESC
+      LIMIT 10
+    `);
+    
+    const [worstMeals] = await pool.query(`
+      SELECT m.name, m.meal_type, 
+             AVG(CASE WHEN r.taste = 'vyborny' THEN 3 WHEN r.taste = 'prijatelne' THEN 2 ELSE 1 END) as score,
+             COUNT(r.id) as count
+      FROM ratings r
+      JOIN meals m ON r.meal_id = m.id
+      GROUP BY m.id, m.name, m.meal_type
+      HAVING count >= 5
+      ORDER BY score ASC
+      LIMIT 10
+    `);
+    
+    res.json({
+      taste: tasteStats,
+      portion: portionStats,
+      temperature: temperatureStats,
+      topMeals: topMeals,
+      worstMeals: worstMeals
+    });
+  } catch (error) {
+    console.error('Chyba při získávání statistik:', error);
+    res.status(500).json({ error: 'Chyba serveru při načítání statistik' });
   }
 });
 

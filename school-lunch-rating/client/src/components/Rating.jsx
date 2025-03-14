@@ -35,15 +35,21 @@ const Rating = () => {
           return;
         }
 
+        console.log(`Kontroluji hodnocení pro jídlo: ${params.id}, uživatel: ${userId}`);
+
+        // Použijeme params.id přímo z URL (to už obsahuje datum_id)
         const response = await axios.get(
           `http://localhost:5000/api/ratings/check/${params.id}/${userId}`
         );
+        
+        console.log('Odpověď serveru:', response.data);
         
         if (response.data.hasRated) {
           setAlreadyRated(true);
         }
       } catch (error) {
         console.error('Chyba při kontrole hodnocení:', error);
+        setError('Chyba při kontrole hodnocení. Zkuste to prosím později.');
       } finally {
         setLoading(false);
       }
@@ -67,7 +73,7 @@ const Rating = () => {
       console.log('Odesílám hodnocení pro jídlo ID:', params.id);
       
       const ratingData = {
-        mealId: params.id,
+        mealId: params.id, // Použijeme kompletní ID včetně datumu
         userId,
         taste: rating.chut,
         appearance: rating.vzhled,
@@ -77,7 +83,9 @@ const Rating = () => {
         comment: rating.komentar
       };
 
-      await axios.post('http://localhost:5000/api/ratings', ratingData);
+      const response = await axios.post('http://localhost:5000/api/ratings', ratingData);
+      
+      console.log('Odpověď serveru:', response.data);
       
       setSuccess(true);
       
