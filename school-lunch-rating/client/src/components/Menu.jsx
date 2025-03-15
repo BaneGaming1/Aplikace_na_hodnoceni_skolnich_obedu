@@ -86,23 +86,17 @@ const Menu = () => {
         const diffTime = date.getTime() - today.getTime();
         const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
         
-        // Vytvoříme kód data pro pozdější použití v ID
-        const dateCode = `${year}${String(month + 1).padStart(2, '0')}${String(day).padStart(2, '0')}`;
-        
         dateArray.push({
           dateText,
           date,
           diffDays,
-          dateCode,
-          meals: data[dateText].map(meal => ({
-            ...meal,
-            uniqueId: `${dateCode}_${meal.id}`
-          }))
+          meals: data[dateText]
         });
       }
     }
     
     // Seřadíme podle vzdálenosti od dnešního dne
+    // Dnešek (0) na začátek, následující dny (1, 2, 3...) po něm, předchozí dny (-1, -2...) na konec
     dateArray.sort((a, b) => {
       // Přednostně řadíme podle toho, jestli je datum dnes, v budoucnu nebo v minulosti
       if ((a.diffDays >= 0 && b.diffDays >= 0) || (a.diffDays < 0 && b.diffDays < 0)) {
@@ -160,63 +154,52 @@ const Menu = () => {
   }
 
   return (
-    <div>
-      <header className="header">
-        <h1 className="logo">Jídelníček</h1>
-        <div className="user-panel">
-          <div className="user-info">
-            Přihlášen jako: {localStorage.getItem('userEmail') || 'D@D'}
-          </div>
+    <div className="menu-page">
+      <div className="menu-header">
+        <h1>Jídelníček</h1>
+        <div className="user-info">
+          <p>Přihlášen jako: {localStorage.getItem('userEmail') || 'D@D'}</p>
           <button onClick={handleLogout} className="logout-button">
             Odhlásit se
           </button>
         </div>
-      </header>
-
-      <div className="container">
-        {Object.entries(menuData).map(([dateText, meals], dayIndex) => {
-          // Vytvoříme kód data pro ID
-          const dateMatch = dateText.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
-          let dateCode = '';
-          if (dateMatch) {
-            const day = String(dateMatch[1]).padStart(2, '0');
-            const month = String(dateMatch[2]).padStart(2, '0');
-            const year = dateMatch[3];
-            dateCode = `${year}${month}${day}`;
-          }
-          
-          return (
-            <div key={dateText}>
-              {dayIndex > 0 && <div className="day-separator"></div>}
-              <h2 className="day-title">{dateText}</h2>
-              <div className="meals-container">
-                {meals.map((meal) => (
-                  <div key={meal.id} className="meal-card">
-                    <div className="meal-header">
-                      <h3>{meal.type}</h3>
-                    </div>
-                    <div className="meal-content">
-                      <p className="meal-description">{meal.name}</p>
-                      <button
-                        className="rate-button"
-                        onClick={() => {
-                          // Použijeme unikátní ID které obsahuje datum
-                          const uniqueId = `${dateCode}_${meal.id}`;
-                          navigate(`/rating/${uniqueId}`, { 
-                            state: { meal: {...meal, id: uniqueId}, dayTitle: dateText } 
-                          });
-                        }}
-                      >
-                        Ohodnotit
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
       </div>
+
+      {Object.entries(menuData).map(([dayTitle, meals]) => {
+        return (
+          <div key={dayTitle} className="day-block">
+            <h2 className="day-heading">{dayTitle}</h2>
+            <div className="meals-grid">
+              {meals.map((meal) => (
+                <div key={meal.id} className="meal-item">
+                  <div className="meal-info">
+                    <h3 className="meal-type">{meal.type}</h3>
+                    <p className="meal-description">{meal.name}</p>
+                  </div>
+                  <div className="meal-actions">
+                    <button
+                      className="action-button rate-button"
+                      onClick={() => navigate(`/rating/${meal.id}`, { 
+                        state: { meal, dayTitle } 
+                      })}
+                    >
+                      Ohodnotit
+                    </button>
+                    <button
+                      className="action-button gallery-button"
+                      onClick={() => navigate(`/gallery/${meal.id}`, {
+                        state: { meal, dayTitle }
+                      })}
+                    >
+                      Galerie
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import ImageGallery from './Gallery'; // Import nové komponenty pro galerii
 
 const Rating = () => {
   const params = useParams();
@@ -11,6 +12,7 @@ const Rating = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showGallery, setShowGallery] = useState(false); // Stav pro zobrazení/skrytí galerie
 
   const meal = location.state?.meal || {};
   const dayTitle = location.state?.dayTitle || '';
@@ -35,21 +37,15 @@ const Rating = () => {
           return;
         }
 
-        console.log(`Kontroluji hodnocení pro jídlo: ${params.id}, uživatel: ${userId}`);
-
-        // Použijeme params.id přímo z URL (to už obsahuje datum_id)
         const response = await axios.get(
           `http://localhost:5000/api/ratings/check/${params.id}/${userId}`
         );
-        
-        console.log('Odpověď serveru:', response.data);
         
         if (response.data.hasRated) {
           setAlreadyRated(true);
         }
       } catch (error) {
         console.error('Chyba při kontrole hodnocení:', error);
-        setError('Chyba při kontrole hodnocení. Zkuste to prosím později.');
       } finally {
         setLoading(false);
       }
@@ -73,7 +69,7 @@ const Rating = () => {
       console.log('Odesílám hodnocení pro jídlo ID:', params.id);
       
       const ratingData = {
-        mealId: params.id, // Použijeme kompletní ID včetně datumu
+        mealId: params.id,
         userId,
         taste: rating.chut,
         appearance: rating.vzhled,
@@ -83,16 +79,12 @@ const Rating = () => {
         comment: rating.komentar
       };
 
-      const response = await axios.post('http://localhost:5000/api/ratings', ratingData);
-      
-      console.log('Odpověď serveru:', response.data);
+      await axios.post('http://localhost:5000/api/ratings', ratingData);
       
       setSuccess(true);
       
-      // Po 2 sekundách přesměrujeme zpět na menu
-      setTimeout(() => {
-        navigate('/menu');
-      }, 2000);
+      // Po úspěšném hodnocení zobrazíme galerii
+      setShowGallery(true);
     } catch (error) {
       console.error('Chyba při odesílání hodnocení:', error);
       let errorMessage = 'Nepodařilo se odeslat hodnocení. Zkuste to prosím později.';
@@ -116,25 +108,6 @@ const Rating = () => {
     );
   }
 
-  if (alreadyRated) {
-    return (
-      <div className="rating-container">
-        <div className="rating-header">
-          <button onClick={() => navigate('/menu')} className="back-button">
-            ← Zpět
-          </button>
-          <h2>Hodnocení obědu</h2>
-        </div>
-        <div className="already-rated-message">
-          <p>Toto jídlo jste již hodnotili.</p>
-          <button onClick={() => navigate('/menu')} className="back-button">
-            Zpět na jídelníček
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="rating-container">
       <div className="rating-header">
@@ -144,19 +117,50 @@ const Rating = () => {
         <h2>Hodnocení obědu</h2>
       </div>
 
-      {success ? (
+      <div className="meal-info">
+        <h3>{dayTitle}</h3>
+        <p>{meal.type}: {meal.name}</p>
+      </div>
+
+      {alreadyRated ? (
+        <div className="already-rated-message">
+          <p>Toto jídlo jste již hodnotili.</p>
+          <button 
+            onClick={() => setShowGallery(!showGallery)} 
+            className="toggle-gallery-button"
+          >
+            {showGallery ? 'Skrýt galerii' : 'Zobrazit galerii obrázků'}
+          </button>
+          
+          {/* Zobrazíme galerii, pokud je uživatel již hodnotil a chce ji vidět */}
+          {showGallery && <ImageGallery mealId={params.id} />}
+        </div>
+      ) : success ? (
         <div className="success-message">
           <p>Hodnocení bylo úspěšně odesláno!</p>
           <p>Děkujeme za váš názor.</p>
+          
+          <button 
+            onClick={() => setShowGallery(!showGallery)} 
+            className="toggle-gallery-button"
+          >
+            {showGallery ? 'Skrýt galerii' : 'Podívat se na galerii obrázků nebo přidat vlastní'}
+          </button>
+          
+          {/* Zobrazíme galerii po úspěšném hodnocení, pokud ji uživatel chce vidět */}
+          {showGallery && <ImageGallery mealId={params.id} />}
+          
+          <button 
+            onClick={() => navigate('/menu')} 
+            className="back-to-menu-button"
+            style={{ marginTop: '20px' }}
+          >
+            Zpět na jídelníček
+          </button>
         </div>
       ) : (
         <>
           {error && <div className="error-message">{error}</div>}
-          
-          <div className="meal-info">
-            <h3>{dayTitle}</h3>
-            <p>{meal.type}: {meal.name}</p>
-          </div>
 
           <form onSubmit={handleSubmit}>
             <div className="rating-group">

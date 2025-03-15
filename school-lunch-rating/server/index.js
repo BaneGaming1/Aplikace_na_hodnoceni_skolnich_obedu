@@ -2,6 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const { scrapeMeals } = require('./scraper');
 const { pool, testConnection } = require('./db');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
 
 // Inicializace Express aplikace
 const app = express();
@@ -15,6 +19,152 @@ app.use(cors({
 
 // Parsování JSON v požadavcích
 app.use(express.json());
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, 'uploads');
+    // Vytvoří složku uploads, pokud neexistuje
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Generování unikátního názvu souboru
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const extension = path.extname(file.originalname);
+    cb(null, 'meal-' + req.body.mealId + '-' + uniqueSuffix + extension);
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Pouze obrázky mohou být nahrány!'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // Max 5MB
+  }
+});
+
+app.post('/api/meals/:id/images', upload.single('image'), async (req, res) => {
+  try {
+    const mealId = req.params.id;
+    const userId = req.body.userId;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'Žádný soubor nebyl nahrán' });
+    }
+
+    // Relativní cesta k souboru v rámci serveru
+    const imagePath = '/uploads/' + file.filename;
+
+    // Kontrola, zda jídlo existuje v databázi
+    const [existingMeals] = await pool.query(
+      'SELECT id FROM meals WHERE id = ?',
+      [mealId]
+    );
+
+    // Pokud jídlo neexistuje, vytvoříme ho
+    if (existingMeals.length === 0) {
+      await pool.query(
+        'INSERT INTO meals (id, date, meal_type, name) VALUES (?, CURDATE(), ?, ?)',
+        [mealId, 'Oběd', 'Jídlo z jídelníčku']
+      );
+    }
+
+    // Uložíme informace o obrázku do databáze
+    const [result] = await pool.query(
+      'INSERT INTO meal_images (meal_id, user_id, image_path) VALUES (?, ?, ?)',
+      [mealId, userId, imagePath]
+    );
+
+    res.json({ 
+      success: true, 
+      imageId: result.insertId,
+      imagePath: imagePath
+    });
+  } catch (error) {
+    console.error('Chyba při nahrávání obrázku:', error);
+    res.status(500).json({ 
+      error: 'Chyba serveru při ukládání obrázku', 
+      details: error.message 
+    });
+  }
+});
+
+// Endpoint pro získání obrázků konkrétního jídla
+app.get('/api/meals/:id/images', async (req, res) => {
+  try {
+    const mealId = req.params.id;
+
+    // Získáme obrázky pro dané jídlo, včetně emailu uživatele
+    const [images] = await pool.query(
+      `SELECT mi.id, mi.meal_id, mi.user_id, mi.image_path, mi.created_at, u.email 
+       FROM meal_images mi
+       LEFT JOIN users u ON mi.user_id = u.id
+       WHERE mi.meal_id = ?
+       ORDER BY mi.created_at DESC`,
+      [mealId]
+    );
+
+    res.json(images);
+  } catch (error) {
+    console.error('Chyba při získávání obrázků:', error);
+    res.status(500).json({ error: 'Chyba serveru při načítání obrázků' });
+  }
+});
+
+// Endpoint pro smazání obrázku (pouze vlastník může smazat)
+app.delete('/api/meals/images/:imageId', async (req, res) => {
+  try {
+    const imageId = req.params.imageId;
+    const userId = req.query.userId;
+
+    // Nejprve získáme informace o obrázku
+    const [images] = await pool.query(
+      'SELECT * FROM meal_images WHERE id = ?',
+      [imageId]
+    );
+
+    if (images.length === 0) {
+      return res.status(404).json({ error: 'Obrázek nebyl nalezen' });
+    }
+
+    const image = images[0];
+
+    // Zkontrolujeme, zda je uživatel vlastníkem obrázku
+    if (image.user_id != userId) {
+      return res.status(403).json({ error: 'Neoprávněný přístup' });
+    }
+
+    // Smažeme záznam z databáze
+    await pool.query(
+      'DELETE FROM meal_images WHERE id = ?',
+      [imageId]
+    );
+
+    // Smažeme samotný soubor
+    const filePath = path.join(__dirname, image.image_path.replace('/uploads/', 'uploads/'));
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Chyba při mazání obrázku:', error);
+    res.status(500).json({ error: 'Chyba serveru při mazání obrázku' });
+  }
+});
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Test připojení k databázi při startu serveru
 testConnection();
@@ -367,6 +517,129 @@ app.get('/api/statistics', async (req, res) => {
   } catch (error) {
     console.error('Chyba při získávání statistik:', error);
     res.status(500).json({ error: 'Chyba serveru při načítání statistik' });
+  }
+});
+
+app.get('/api/gallery/:mealId', async (req, res) => {
+  try {
+    const mealId = req.params.mealId;
+    
+    // Získání informací o jídle
+    const [mealRows] = await pool.query(
+      'SELECT id, date, meal_type as type, name FROM meals WHERE id = ?',
+      [mealId]
+    );
+    
+    const mealInfo = mealRows.length > 0 ? mealRows[0] : null;
+    
+    // Získání obrázků pro dané jídlo
+    const [images] = await pool.query(
+      `SELECT mi.id, mi.image_path, mi.created_at, u.email as uploaded_by
+       FROM meal_images mi
+       LEFT JOIN users u ON mi.user_id = u.id
+       WHERE mi.meal_id = ?
+       ORDER BY mi.created_at DESC`,
+      [mealId]
+    );
+    
+    res.json({ mealInfo, images });
+  } catch (error) {
+    console.error('Chyba při získávání galerie:', error);
+    res.status(500).json({ error: 'Chyba serveru při načítání galerie' });
+  }
+});
+
+// Endpoint pro nahrání obrázku
+app.post('/api/gallery/upload', upload.single('image'), async (req, res) => {
+  try {
+    const { mealId, userId } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nebyl nahrán žádný soubor' });
+    }
+    
+    // Kontrola, zda mealId existuje v databázi, případně ho vytvoříme
+    const [existingMeals] = await pool.query(
+      'SELECT id FROM meals WHERE id = ?',
+      [mealId]
+    );
+    
+    if (existingMeals.length === 0) {
+      // Pokud jídlo neexistuje v databázi, vytvoříme záznam
+      await pool.query(
+        'INSERT INTO meals (id, date, meal_type, name) VALUES (?, CURDATE(), ?, ?)',
+        [mealId, 'Oběd', 'Jídlo z jídelníčku']
+      );
+    }
+    
+    // Vložení záznamu o obrázku do databáze
+    await pool.query(
+      'INSERT INTO meal_images (meal_id, user_id, image_path) VALUES (?, ?, ?)',
+      [mealId, userId, req.file.filename]
+    );
+    
+    res.json({ 
+      success: true,
+      message: 'Obrázek byl úspěšně nahrán',
+      filePath: req.file.filename
+    });
+  } catch (error) {
+    console.error('Chyba při nahrávání obrázku:', error);
+    res.status(500).json({ error: 'Chyba serveru při nahrávání obrázku' });
+  }
+});
+
+// Endpoint pro smazání obrázku (jen pro uživatele, který ho nahrál, nebo adminy)
+app.delete('/api/gallery/:imageId', async (req, res) => {
+  try {
+    const { imageId } = req.params;
+    const { userId } = req.body;
+    
+    // Kontrola, zda uživatel může smazat tento obrázek
+    const [images] = await pool.query(
+      `SELECT mi.*, u.role FROM meal_images mi
+       JOIN users u ON mi.user_id = u.id
+       WHERE mi.id = ?`,
+      [imageId]
+    );
+    
+    if (images.length === 0) {
+      return res.status(404).json({ error: 'Obrázek nebyl nalezen' });
+    }
+    
+    const image = images[0];
+    
+    // Kontrola, zda je uživatel vlastníkem nebo admin
+    const [users] = await pool.query(
+      'SELECT role FROM users WHERE id = ?',
+      [userId]
+    );
+    
+    if (users.length === 0) {
+      return res.status(401).json({ error: 'Neautorizovaný přístup' });
+    }
+    
+    const userRole = users[0].role;
+    
+    if (image.user_id !== parseInt(userId) && userRole !== 'admin') {
+      return res.status(403).json({ error: 'Nemáte oprávnění smazat tento obrázek' });
+    }
+    
+    // Smazání souboru
+    const filePath = path.join(__dirname, 'uploads', image.image_path);
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        console.error('Chyba při mazání souboru:', err);
+      }
+    });
+    
+    // Smazání záznamu z databáze
+    await pool.query('DELETE FROM meal_images WHERE id = ?', [imageId]);
+    
+    res.json({ success: true, message: 'Obrázek byl úspěšně smazán' });
+  } catch (error) {
+    console.error('Chyba při mazání obrázku:', error);
+    res.status(500).json({ error: 'Chyba serveru při mazání obrázku' });
   }
 });
 

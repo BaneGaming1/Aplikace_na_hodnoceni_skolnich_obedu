@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Menu from './components/Menu';
 import Rating from './components/Rating';
+import Gallery from './components/Gallery';
 import Login from './components/Login';
 import './App.css';
 
@@ -10,8 +11,10 @@ const App = () => {
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/menu" element={<Menu />} />
         <Route path="/rating/:id" element={<Rating />} />
+        <Route path="/gallery/:id" element={<Gallery />} />
       </Routes>
     </Router>
   );

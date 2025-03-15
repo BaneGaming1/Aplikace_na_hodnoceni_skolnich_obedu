@@ -1,12 +1,22 @@
+/* Základní proměnné */
 :root {
-  --primary-blue: #007bff;
-  --primary-hover: #0056b3;
-  --background-color: #f9f9f9;
-  --text-dark: #333;
-  --border-light: #eaeaea;
-  --card-bg: #fff;
+  --primary-blue: #0066FF;
+  --primary-dark: #0052cc;
+  --secondary-color: #ff6b35;
+  --secondary-dark: #e85a2a;
+  --background-color: #F8F9FA;
+  --text-dark: #333333;
+  --text-medium: #555555;
+  --text-light: #666666;
+  --border-color: #E5E7EB;
+  --success-color: #28a745;
+  --danger-color: #dc3545;
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --header-height: 70px;
 }
 
+/* Reset a základní styly */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -15,52 +25,192 @@
 
 body {
   background-color: var(--background-color);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: var(--text-dark);
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
+/* Společné komponenty */
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
 }
 
-/* Hlavička */
-.header {
-  padding: 20px;
-  background-color: white;
-  border-bottom: 1px solid var(--border-light);
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.button {
+  display: inline-block;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  border: none;
+}
+
+.button-primary {
+  background-color: var(--primary-blue);
+  color: white;
+}
+
+.button-primary:hover {
+  background-color: var(--primary-dark);
+}
+
+.button-secondary {
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+.button-secondary:hover {
+  background-color: var(--secondary-dark);
+}
+
+.button-outline {
+  background-color: transparent;
+  border: 1px solid var(--primary-blue);
+  color: var(--primary-blue);
+}
+
+.button-outline:hover {
+  background-color: rgba(0, 102, 255, 0.05);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--primary-blue);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 8px 0;
+}
+
+.back-button:hover {
+  text-decoration: underline;
+}
+
+/* Základní formulářové prvky */
+input, textarea, select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 15px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.15);
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-dark);
+}
+
+/* Zprávy a oznámení */
+.error-message {
+  background-color: rgba(220, 53, 69, 0.1);
+  color: var(--danger-color);
+  padding: 12px;
+  border-radius: 6px;
+  margin: 12px 0;
+  border-left: 4px solid var(--danger-color);
+}
+
+.success-message {
+  background-color: rgba(40, 167, 69, 0.1);
+  color: var(--success-color);
+  padding: 12px;
+  border-radius: 6px;
+  margin: 12px 0;
+  border-left: 4px solid var(--success-color);
+}
+
+/* Loading komponenty */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.loading-spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border-left-color: var(--primary-blue);
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Hlavní navigační lišta */
+.navbar {
+  position: sticky;
+  top: 0;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  z-index: 100;
+  height: var(--header-height);
+}
+
+.navbar-content {
+  height: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .logo {
-  font-size: 1.8rem;
+  font-size: 24px;
   font-weight: bold;
   color: var(--text-dark);
   text-decoration: none;
 }
 
-.user-panel {
+.user-info {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 16px;
 }
 
-.user-info {
-  font-size: 0.9rem;
+.user-email {
+  font-size: 14px;
+  color: var(--text-light);
 }
 
 .logout-button {
   background-color: transparent;
-  border: 1px solid var(--primary-blue);
   color: var(--primary-blue);
-  padding: 8px 15px;
+  border: 1px solid var(--primary-blue);
+  padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.9rem;
   transition: all 0.2s;
 }
 
@@ -69,128 +219,244 @@ body {
   color: white;
 }
 
-/* Jídelníček */
-.day-title {
-  text-align: center;
-  font-size: 1.5rem;
-  margin: 40px 0 20px;
-  color: #444;
-}
-
-.meals-container {
+/* ===== Login Page Styles ===== */
+.login-page {
+  min-height: 100vh;
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  background-color: var(--background-color);
 }
 
-.meal-card {
-  background-color: var(--card-bg);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  width: calc(50% - 10px);
-  overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.meal-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.meal-header {
-  background-color: #f8f8f8;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.meal-header h3 {
-  margin: 0;
-  font-size: 1.2rem;
-  color: #444;
-}
-
-.meal-content {
-  padding: 20px;
-}
-
-.meal-description {
-  margin-bottom: 20px;
-  color: #555;
-  min-height: 60px;
-}
-
-.rate-button {
-  display: block;
+.login-box {
+  background: white;
+  padding: 2.5rem;
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
   width: 100%;
-  padding: 10px 0;
+  max-width: 400px;
+}
+
+.login-box h1 {
+  margin: 0;
+  font-size: 28px;
+  color: var(--text-dark);
+  text-align: center;
+}
+
+.subtitle {
+  color: var(--text-light);
+  text-align: center;
+  margin: 8px 0 32px;
+}
+
+.input-group {
+  margin-bottom: 20px;
+}
+
+.login-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+.login-button {
+  width: 100%;
+  padding: 12px;
   background-color: var(--primary-blue);
   color: white;
   border: none;
-  border-radius: 4px;
-  text-align: center;
-  font-size: 1rem;
+  border-radius: 6px;
+  font-size: 15px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.3s;
 }
 
-.rate-button:hover {
-  background-color: var(--primary-hover);
+.login-button:hover {
+  background-color: var(--primary-dark);
 }
 
-/* Hodnocení */
-.rating-container {
-  max-width: 800px;
-  margin: 40px auto;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 30px;
+/* ===== Menu Page Styles ===== */
+.menu-page {
+  padding: 2rem 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.rating-header {
-  margin-bottom: 30px;
+.menu-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
 }
 
-.rating-header h2 {
-  font-size: 1.5rem;
+.menu-header h1 {
+  font-size: 28px;
+  color: var(--text-dark);
   margin: 0;
 }
 
-.back-button {
-  background: transparent;
-  border: none;
-  color: var(--primary-blue);
-  cursor: pointer;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 5px;
+.day-block {
+  margin-bottom: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.day-heading {
+  padding: 1rem;
+  margin: 0;
+  font-size: 20px;
+  color: var(--text-dark);
+  background-color: rgba(0, 102, 255, 0.05);
+  border-bottom: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.meals-grid {
+  padding: 1rem;
+}
+
+.meal-item {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.meal-item:last-child {
+  border-bottom: none;
 }
 
 .meal-info {
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 1rem;
+}
+
+.meal-type {
+  font-size: 18px;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-dark);
+}
+
+.meal-description {
+  color: var(--text-medium);
+  margin: 0;
+}
+
+.meal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.action-button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  color: white;
+}
+
+.rate-button {
+  background: var(--primary-blue);
+}
+
+.rate-button:hover {
+  background: var(--primary-dark);
+}
+
+.gallery-button {
+  background: var(--secondary-color);
+}
+
+.gallery-button:hover {
+  background: var(--secondary-dark);
+}
+
+/* ===== Rating Page Styles ===== */
+.rating-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+}
+
+.rating-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.rating-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--text-dark);
+}
+
+.meal-info {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: rgba(0, 102, 255, 0.05);
+  border-radius: 8px;
+}
+
+.meal-info h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 18px;
+  color: var(--text-dark);
+}
+
+.meal-info p {
+  margin: 0;
+  color: var(--text-medium);
+}
+
+.rating-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.rating-item {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.rating-item label {
+  font-weight: 500;
+  margin-bottom: 8px;
 }
 
 .rating-options {
   display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .rating-option {
-  flex: 1;
-  padding: 10px;
-  text-align: center;
-  border: 1px solid var(--border-light);
-  border-radius: 4px;
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+.rating-option:hover {
+  border-color: var(--primary-blue);
 }
 
 .rating-option.active {
@@ -199,166 +465,343 @@ body {
   border-color: var(--primary-blue);
 }
 
-.rating-item {
-  margin-bottom: 20px;
-}
-
-.rating-item label {
-  display: block;
-  margin-bottom: 10px;
-  font-weight: 500;
+.comment-section {
+  margin-top: 2rem;
 }
 
 .comment-section textarea {
   width: 100%;
-  min-height: 100px;
-  padding: 10px;
-  border: 1px solid var(--border-light);
-  border-radius: 4px;
-  font-family: inherit;
+  min-height: 120px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   resize: vertical;
+  font-family: inherit;
 }
 
 .submit-button {
   width: 100%;
-  padding: 12px 0;
+  padding: 12px;
   background-color: var(--primary-blue);
   color: white;
   border: none;
-  border-radius: 4px;
-  margin-top: 20px;
-  font-size: 1rem;
+  border-radius: 6px;
+  font-size: 16px;
   cursor: pointer;
+  margin-top: 1.5rem;
 }
 
 .submit-button:hover {
-  background-color: var(--primary-hover);
+  background-color: var(--primary-dark);
 }
 
-/* Přihlášení */
-.login-page {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-}
-
-.login-box {
-  width: 100%;
-  max-width: 400px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  padding: 30px;
-}
-
-.login-box h1 {
-  text-align: center;
-  margin-bottom: 5px;
-}
-
-.subtitle {
-  text-align: center;
-  color: #666;
-  margin-bottom: 30px;
-}
-
-.login-input {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 15px;
-  border: 1px solid var(--border-light);
-  border-radius: 4px;
-  font-size: 1rem;
-}
-
-.login-button {
-  width: 100%;
-  padding: 12px 0;
-  background-color: var(--primary-blue);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-/* Responzivita */
-@media (max-width: 768px) {
-  .meal-card {
-    width: 100%;
-  }
-  
-  .user-panel {
-    flex-direction: column;
-    align-items: flex-end;
-  }
-  
-  .rating-options {
-    flex-direction: column;
-  }
-}
-
-/* Oddělovač pro dny */
-.day-separator {
-  height: 1px;
-  background-color: var(--border-light);
-  margin: 40px 0;
-}
-
-.gallery-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.gallery-content {
-  background-color: white;
-  width: 90%;
-  max-width: 900px;
-  max-height: 90vh;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+/* ===== Gallery Page Styles ===== */
+.gallery-container {
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
 }
 
 .gallery-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.gallery-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--text-dark);
+}
+
+.meal-info-gallery {
+  background-color: rgba(0, 102, 255, 0.05);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.meal-info-gallery h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 18px;
+  color: var(--text-dark);
+}
+
+.meal-info-gallery h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 16px;
+  color: var(--text-medium);
+}
+
+.meal-info-gallery p {
+  margin: 0;
+  color: var(--text-light);
+}
+
+.upload-section {
+  background-color: rgba(0, 0, 0, 0.02);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.upload-section h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 18px;
+  color: var(--text-dark);
+}
+
+.file-upload-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.file-input {
+  width: 0.1px;
+  height: 0.1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  z-index: -1;
+}
+
+.file-label {
+  padding: 10px 16px;
+  background-color: var(--primary-blue);
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-block;
+  transition: background-color 0.2s;
+}
+
+.file-label:hover {
+  background-color: var(--primary-dark);
+}
+
+.upload-button {
+  padding: 10px 16px;
+  background-color: var(--secondary-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.upload-button:hover {
+  background-color: var(--secondary-dark);
+}
+
+.preview-container {
+  margin-top: 1.5rem;
+}
+
+.preview-container h4 {
+  margin-bottom: 0.5rem;
+  font-size: 16px;
+  color: var(--text-dark);
+}
+
+.image-preview {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
+}
+
+.gallery-images h3 {
+  margin: 0 0 1rem 0;
+  font-size: 18px;
+  color: var(--text-dark);
+}
+
+.no-images {
+  text-align: center;
+  color: var(--text-light);
+  padding: 2rem;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+}
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.image-card {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.image-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--card-shadow-hover);
+}
+
+.food-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+.image-info {
+  padding: 12px;
+  background-color: white;
+}
+
+.image-info p {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+/* Responzivní styly */
+@media (max-width: 768px) {
+  .menu-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .rating-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .rating-options {
+    margin-top: 8px;
+  }
+  
+  .file-upload-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .file-label, .upload-button {
+    text-align: center;
+  }
+  
+  .images-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .rating-container, .gallery-container {
+    padding: 1.5rem;
+  }
+  
+  .login-box {
+    padding: 1.5rem;
+  }
+  
+  .images-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .meal-actions {
+    flex-direction: column;
+  }
+}
+
+/* Minimalistické CSS pro galerii */
+.gallery-page {
+  max-width: 900px;
+  margin: 20px auto;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.gallery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
   border-bottom: 1px solid #eee;
 }
 
-.gallery-header h3 {
-  margin: 0;
-  font-size: 1.3rem;
-  color: #333;
-}
-
-.close-gallery {
+.back-button {
   background: none;
   border: none;
-  font-size: 24px;
-  color: #666;
+  color: #0066FF;
   cursor: pointer;
 }
 
-.gallery-body {
-  padding: 20px;
-  overflow-y: auto;
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.back-button:hover {
+  text-decoration: underline;
+}
+
+.meal-info {
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border-radius: 5px;
+}
+
+.meal-info h3 {
+  margin: 0 0 10px 0;
+}
+
+.meal-info p {
+  margin: 0;
+}
+
+.upload-form {
+  margin-bottom: 30px;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 5px;
+}
+
+.upload-form h3 {
+  margin-top: 0;
+}
+
+.upload-form input[type="file"] {
+  margin-bottom: 10px;
+  display: block;
+}
+
+.upload-button {
+  padding: 8px 16px;
+  background-color: #0066FF;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.upload-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gallery-content h3 {
+  margin-bottom: 15px;
+}
+
+.empty-gallery {
+  text-align: center;
+  padding: 30px;
+  background-color: #f9f9f9;
+  border-radius: 5px;
 }
 
 .gallery-grid {
@@ -368,151 +811,21 @@ body {
 }
 
 .gallery-item {
-  position: relative;
-  cursor: pointer;
-  border-radius: 6px;
+  border-radius: 5px;
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
-  aspect-ratio: 4/3;
-}
-
-.gallery-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .gallery-item img {
   width: 100%;
-  height: 100%;
+  height: 150px;
   object-fit: cover;
+  display: block;
 }
 
-.gallery-item-date {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: rgba(0, 0, 0, 0.6);
-  color: white;
-  padding: 5px 8px;
-  font-size: 0.8rem;
-  text-align: center;
-}
-
-.gallery-upload {
-  margin-top: 15px;
-  display: flex;
-  justify-content: center;
-}
-
-.gallery-upload-btn {
-  background-color: #0066FF;
-  color: white;
-  padding: 10px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s;
-}
-
-.gallery-upload-btn:hover {
-  background-color: #0052cc;
-}
-
-/* Modální okno pro zvětšení obrázku */
-.image-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.9);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1100;
-  cursor: pointer;
-}
-
-.image-modal img {
-  max-width: 90%;
-  max-height: 90vh;
-  object-fit: contain;
-}
-
-/* Obrázek jídla a overlay */
-.meal-image-container {
-  position: relative;
-  width: 100%;
-  height: 200px;
-  cursor: pointer;
-  overflow: hidden;
-}
-
-.meal-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.placeholder-meal-image {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f0f0f0;
+.image-info {
+  padding: 8px;
+  font-size: 12px;
   color: #666;
-  font-size: 0.9rem;
-}
-
-.image-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.meal-image-container:hover .image-overlay {
-  opacity: 1;
-}
-
-.view-gallery-text {
-  color: white;
-  font-weight: 500;
-  background-color: rgba(0, 0, 0, 0.6);
-  padding: 8px 12px;
-  border-radius: 4px;
-}
-
-/* Responzivita */
-@media (max-width: 768px) {
-  .gallery-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
-  
-  .gallery-content {
-    width: 95%;
-    max-height: 95vh;
-  }
-}
-
-@media (max-width: 480px) {
-  .gallery-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  }
-  
-  .gallery-header h3 {
-    font-size: 1.1rem;
-  }
-  
-  .gallery-body {
-    padding: 15px;
-  }
+  background: white;
 }
