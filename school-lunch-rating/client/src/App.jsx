@@ -2,8 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Menu from './components/Menu';
 import Rating from './components/Rating';
-import Gallery from './components/Gallery';
 import Login from './components/Login';
+import Gallery from './components/Gallery';
 import './App.css';
 
 const App = () => {
