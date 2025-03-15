@@ -12,10 +12,15 @@ const Gallery = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Získání informací o jídle z navigačního stavu
   const meal = location.state?.meal || {};
   const dayTitle = location.state?.dayTitle || '';
+  
+  // Získání přihlášeného uživatele z localStorage
+  const userId = localStorage.getItem('userId');
+  const userEmail = localStorage.getItem('userEmail');
 
   // Načtení obrázků při načtení stránky
   useEffect(() => {
@@ -61,7 +66,7 @@ const Gallery = () => {
       const formData = new FormData();
       formData.append('image', selectedFile);
       formData.append('mealId', id);
-      formData.append('userId', localStorage.getItem('userId') || '1');
+      formData.append('userId', userId || '1');
 
       await axios.post('http://localhost:5000/api/gallery/upload', formData, {
         headers: {
@@ -85,6 +90,30 @@ const Gallery = () => {
       setError('Nepodařilo se nahrát obrázek. Zkuste to prosím později.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Smazání obrázku
+  const handleDelete = async (imageId) => {
+    if (!userId || deleting) return;
+    
+    // Oprava ESLint chyby - použijeme window.confirm místo confirm
+    if (!window.confirm('Opravdu chcete smazat tento obrázek?')) return;
+
+    setDeleting(true);
+    try {
+      await axios.delete(`http://localhost:5000/api/gallery/${imageId}`, {
+        data: { userId }
+      });
+      
+      // Po úspěšném smazání aktualizujeme seznam obrázků
+      const response = await axios.get(`http://localhost:5000/api/gallery/${id}`);
+      setImages(response.data.images || []);
+    } catch (err) {
+      console.error('Chyba při mazání obrázku:', err);
+      setError('Nepodařilo se smazat obrázek. ' + (err.response?.data?.error || 'Zkuste to prosím později.'));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -207,7 +236,8 @@ const Gallery = () => {
                 border: '1px solid #eee',
                 borderRadius: '8px',
                 overflow: 'hidden',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                position: 'relative'
               }}>
                 <img
                   src={`http://localhost:5000/uploads/${image.image_path}`}
@@ -217,6 +247,35 @@ const Gallery = () => {
                     e.target.src = 'https://via.placeholder.com/200x150?text=Obrázek+není+dostupný';
                   }}
                 />
+
+                {/* Tlačítko smazat - zobrazí se jen u vlastních obrázků */}
+                {userEmail && image.uploaded_by === userEmail && (
+                  <button
+                    onClick={() => handleDelete(image.id)}
+                    disabled={deleting}
+                    style={{
+                      position: 'absolute',
+                      top: '5px',
+                      right: '5px',
+                      backgroundColor: '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '25px',
+                      height: '25px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      opacity: deleting ? 0.7 : 1
+                    }}
+                    title="Smazat obrázek"
+                  >
+                    ×
+                  </button>
+                )}
+
                 <div style={{ padding: '10px' }}>
                   <p style={{ margin: '0 0 5px 0', fontSize: '14px', color: '#666' }}>
                     {new Date(image.created_at).toLocaleDateString()}
