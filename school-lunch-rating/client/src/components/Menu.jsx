@@ -169,16 +169,14 @@ const Menu = () => {
         return (
           <div key={dayTitle} className="day-block">
             <h2 className="day-heading">{dayTitle}</h2>
-            <div className="meals-grid">
+            <div className="meals-list">
               {meals.map((meal) => (
-                <div key={meal.id} className="meal-item">
-                  <div className="meal-info">
-                    <h3 className="meal-type">{meal.type}</h3>
-                    <p className="meal-description">{meal.name}</p>
-                  </div>
-                  <div className="meal-actions">
+                <div key={meal.id} className="meal-card">
+                  <h3>{meal.type}</h3>
+                  <p className="meal-name">{meal.name}</p>
+                  <div className="button-group">
                     <button
-                      className="action-button rate-button"
+                      className="rate-button"
                       onClick={() => navigate(`/rating/${meal.id}`, { 
                         state: { meal, dayTitle } 
                       })}
@@ -186,10 +184,11 @@ const Menu = () => {
                       Ohodnotit
                     </button>
                     <button
-                      className="action-button gallery-button"
-                      onClick={() => navigate(`/gallery/${meal.id}`, {
-                        state: { meal, dayTitle }
-                      })}
+                      className="gallery-button"
+                      onClick={() => {
+                        console.log('Navigace do galerie pro jídlo ID:', meal.id);
+                        navigate(`/gallery/${meal.id}`);
+                      }}
                     >
                       Galerie
                     </button>

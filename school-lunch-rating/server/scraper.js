@@ -31,8 +31,22 @@ async function scrapeMeals() {
 
         // Zkontrolujeme, že máme všechna data
         if (type && name) {
+          // NOVÉ: Vytvoření unikátního ID s datem
+          const dateMatch = dateText.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+          let uniqueId;
+          
+          if (dateMatch) {
+            // Vytvoříme ID ve formátu "20250318_Obed1"
+            const day = dateMatch[1].padStart(2, '0');
+            const month = dateMatch[2].padStart(2, '0');
+            const year = dateMatch[3];
+            uniqueId = `${year}${month}${day}_${type.replace(/\s+/g, '')}`;
+          } else {
+            uniqueId = `day${i}_${type.replace(/\s+/g, '')}_${j+1}`;
+          }
+          
           meals.push({
-            id: meals.length + 1,
+            id: uniqueId, // UNIKÁTNÍ ID
             type: type,
             name: name
           });
@@ -96,8 +110,22 @@ async function scrapeMeals() {
                   unsortedData[dateText] = [];
                 }
                 
+                // NOVÉ: Vytvoření unikátního ID s datem
+                const dateMatch = dateText.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+                let uniqueId;
+                
+                if (dateMatch) {
+                  // Vytvoříme ID ve formátu "20250318_Obed1"
+                  const day = dateMatch[1].padStart(2, '0');
+                  const month = dateMatch[2].padStart(2, '0');
+                  const year = dateMatch[3];
+                  uniqueId = `${year}${month}${day}_${type.replace(/\s+/g, '')}`;
+                } else {
+                  uniqueId = `day${i}_${type.replace(/\s+/g, '')}_${unsortedData[dateText].length+1}`;
+                }
+                
                 unsortedData[dateText].push({
-                  id: unsortedData[dateText].length + 1,
+                  id: uniqueId, // UNIKÁTNÍ ID
                   type: type,
                   name: name
                 });

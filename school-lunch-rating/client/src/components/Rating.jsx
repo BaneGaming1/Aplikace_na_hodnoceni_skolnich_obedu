@@ -26,33 +26,37 @@ const Rating = () => {
     komentar: ''
   });
 
-  useEffect(() => {
-    // Kontrola, zda uživatel již hodnotil toto jídlo
-    const checkRating = async () => {
-      try {
-        const userId = localStorage.getItem('userId');
-        if (!userId) {
-          // Pokud uživatel není přihlášen, přesměrujeme na přihlášení
-          navigate('/login');
-          return;
-        }
-
-        const response = await axios.get(
-          `http://localhost:5000/api/ratings/check/${params.id}/${userId}`
-        );
-        
-        if (response.data.hasRated) {
-          setAlreadyRated(true);
-        }
-      } catch (error) {
-        console.error('Chyba při kontrole hodnocení:', error);
-      } finally {
-        setLoading(false);
+  // Kontrola, zda uživatel již hodnotil toto jídlo
+useEffect(() => {
+  const checkRating = async () => {
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        navigate('/login');
+        return;
       }
-    };
 
-    checkRating();
-  }, [params.id, navigate]);
+      // OPRAVA: Přesná kontrola ID jídla
+      console.log('Kontrola hodnocení pro jídlo ID:', params.id, 'a uživatele ID:', userId);
+      const response = await axios.get(
+        `http://localhost:5000/api/ratings/check/${params.id}/${userId}`
+      );
+      
+      console.log('Odpověď API:', response.data);
+      
+      if (response.data && response.data.hasRated) {
+        console.log('Uživatel již ohodnotil toto jídlo.');
+        setAlreadyRated(true);
+      }
+    } catch (error) {
+      console.error('Chyba při kontrole hodnocení:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  checkRating();
+}, [params.id, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

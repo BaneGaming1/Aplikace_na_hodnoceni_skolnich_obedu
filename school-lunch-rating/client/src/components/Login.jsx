@@ -3,81 +3,86 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const Login = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(true); // true = login, false = registrace
   const [credentials, setCredentials] = useState({
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '' // pro registraci
   });
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  // Přihlášení uživatele - PŮVODNÍ FUNKCE, ZACHOVÁNO
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setSuccess('');
-    
-    // Validace emailu
-    if (!credentials.email.endsWith('@spsejecna.cz')) {
-      setError('Musíte použít školní email (@spsejecna.cz)');
-      setLoading(false);
-      return;
-    }
-
-    // Validace hesla při registraci
-    if (!isLogin && credentials.password !== credentials.confirmPassword) {
-      setError('Hesla se neshodují');
-      setLoading(false);
-      return;
-    }
     
     try {
-      // Přihlášení nebo registrace podle aktuálního režimu
-      const endpoint = isLogin ? '/api/login' : '/api/register';
-      
-      const response = await axios.post(`http://localhost:5000${endpoint}`, {
+      const response = await axios.post('http://localhost:5000/api/login', {
         email: credentials.email,
         password: credentials.password
       });
       
       if (response.data.success) {
-        if (isLogin) {
-          // Při přihlášení uložíme data a přesměrujeme na jídelníček
-          localStorage.setItem('userId', response.data.userId);
-          localStorage.setItem('userEmail', credentials.email);
-          navigate('/menu');
-        } else {
-          // Při úspěšné registraci zobrazíme zprávu a přepneme na přihlášení
-          setSuccess('Registrace proběhla úspěšně! Nyní se můžete přihlásit.');
-          setIsLogin(true);
-          setCredentials({
-            ...credentials,
-            password: '',
-            confirmPassword: ''
-          });
-        }
+        // Uložíme ID uživatele do localStorage pro další použití
+        localStorage.setItem('userId', response.data.userId);
+        localStorage.setItem('userEmail', credentials.email);
+        navigate('/menu');
       }
     } catch (error) {
-      console.error('Chyba:', error);
+      console.error('Chyba při přihlašování:', error);
       if (error.response && error.response.data && error.response.data.error) {
         setError(error.response.data.error);
       } else {
-        setError(isLogin 
-          ? 'Nepodařilo se přihlásit. Zkuste to prosím později.' 
-          : 'Nepodařilo se zaregistrovat. Zkuste to prosím později.');
+        setError('Nepodařilo se přihlásit. Zkuste to prosím později.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const switchMode = () => {
+  // Registrace uživatele
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    
+    // Validace hesla
+    if (credentials.password !== credentials.confirmPassword) {
+      setError('Hesla se neshodují');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await axios.post('http://localhost:5000/api/register', {
+        email: credentials.email,
+        password: credentials.password
+      });
+      
+      if (response.data.success) {
+        // Uložíme ID uživatele a přesměrujeme
+        localStorage.setItem('userId', response.data.userId);
+        localStorage.setItem('userEmail', credentials.email);
+        navigate('/menu');
+      }
+    } catch (error) {
+      console.error('Chyba při registraci:', error);
+      if (error.response && error.response.data && error.response.data.error) {
+        setError(error.response.data.error);
+      } else {
+        setError('Nepodařilo se zaregistrovat. Zkuste to prosím později.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleAuthMode = () => {
     setIsLogin(!isLogin);
     setError('');
-    setSuccess('');
   };
 
   return (
@@ -87,15 +92,14 @@ const Login = () => {
         <p className="subtitle">Systém hodnocení školních obědů</p>
         
         {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
         
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={isLogin ? handleLogin : handleRegister}>
           <div className="input-group">
             <input
               type="email"
               value={credentials.email}
               onChange={(e) => setCredentials({...credentials, email: e.target.value})}
-              placeholder="Školní email (@spsejecna.cz)"
+              placeholder="Školní email"
               required
               className="login-input"
             />
@@ -136,19 +140,15 @@ const Login = () => {
           </button>
         </form>
 
-        <div className="switch-mode">
-          <p>
-            {isLogin 
-              ? 'Nemáte účet?' 
-              : 'Již máte účet?'} 
-            <button 
-              onClick={switchMode}
-              className="switch-button"
-            >
-              {isLogin ? 'Zaregistrujte se' : 'Přihlaste se'}
-            </button>
-          </p>
-        </div>
+        <p className="auth-toggle">
+          {isLogin ? 'Nemáte účet?' : 'Již máte účet?'}
+          <button 
+            onClick={toggleAuthMode} 
+            className="toggle-button"
+          >
+            {isLogin ? 'Zaregistrovat se' : 'Přihlásit se'}
+          </button>
+        </p>
       </div>
     </div>
   );

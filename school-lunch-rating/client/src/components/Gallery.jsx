@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import '../Gallery.css'; // Vytvoříme CSS soubor (popsán níže)
 
 const Gallery = () => {
   const { id } = useParams();
@@ -9,27 +8,27 @@ const Gallery = () => {
   const [meal, setMeal] = useState(null);
   const [images, setImages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
 
+  // Při načtení komponenty
   useEffect(() => {
-    // Kontrola, zda je uživatel přihlášen
+    // Kontrola přihlášení
     const userId = localStorage.getItem('userId');
     if (!userId) {
       navigate('/login');
       return;
     }
 
-    const fetchMealAndImages = async () => {
+    const fetchData = async () => {
       try {
-        // Pokusíme se načíst detail jídla
+        console.log('Načítám galerii pro jídlo ID:', id);
+        
+        // Načtení informací o jídle
         try {
           const mealResponse = await axios.get(`http://localhost:5000/api/meals/${id}`);
           setMeal(mealResponse.data);
         } catch (err) {
-          console.log('Jídlo nebylo nalezeno v databázi, používáme ID z URL');
-          // Pokud jídlo není v databázi, použijeme ID a nastavíme základní informace
+          // Pokud jídlo není v DB, nastavíme základní údaje
           setMeal({
             id: id,
             name: 'Jídlo z jídelníčku',
@@ -37,26 +36,27 @@ const Gallery = () => {
           });
         }
         
-        // Načteme fotografie pro konkrétní jídlo
+        // Načtení fotografií konkrétního jídla
         const imagesResponse = await axios.get(`http://localhost:5000/api/meals/${id}/images`);
-        console.log('Načtené fotografie:', imagesResponse.data);
         setImages(imagesResponse.data);
+        console.log('Načteno fotografií:', imagesResponse.data.length);
         
         setIsLoading(false);
       } catch (err) {
         console.error('Chyba při načítání dat:', err);
-        setError('Nepodařilo se načíst data. Zkuste to prosím později.');
         setIsLoading(false);
       }
     };
 
-    fetchMealAndImages();
+    fetchData();
   }, [id, navigate]);
 
+  // Vybírání souboru
   const handleFileChange = (e) => {
     setSelectedFile(e.target.files[0]);
   };
 
+  // Odeslání formuláře
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -65,104 +65,102 @@ const Gallery = () => {
       return;
     }
     
-    setUploading(true);
-    
     const formData = new FormData();
     formData.append('image', selectedFile);
-    formData.append('mealId', id); // Důležité - správné ID jídla
+    formData.append('mealId', id);
     formData.append('userId', localStorage.getItem('userId'));
     
     try {
-      const response = await axios.post('http://localhost:5000/api/upload-image', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+      await axios.post('http://localhost:5000/api/upload-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       
-      console.log('Odpověď serveru:', response.data);
+      // Po úspěšném nahrání obnovíme seznam
+      const response = await axios.get(`http://localhost:5000/api/meals/${id}/images`);
+      setImages(response.data);
       
-      // Po úspěšném nahrání obnovíme seznam obrázků
-      const newImagesResponse = await axios.get(`http://localhost:5000/api/meals/${id}/images`);
-      setImages(newImagesResponse.data);
-      
-      setUploading(false);
+      // Reset formuláře
       setSelectedFile(null);
-      
-      // Reset inputu souboru
       document.getElementById('fileInput').value = '';
     } catch (err) {
-      console.error('Chyba při nahrávání fotografie:', err);
-      alert('Nepodařilo se nahrát fotografii. Zkuste to prosím znovu.');
-      setUploading(false);
+      console.error('Chyba při nahrávání:', err);
+      alert('Nepodařilo se nahrát fotografii');
     }
   };
 
+  // Mazání fotografie
+  const handleDeleteImage = async (imageId) => {
+    if (!window.confirm('Opravdu chcete smazat tuto fotografii?')) {
+      return;
+    }
+    
+    try {
+      await axios.delete(`http://localhost:5000/api/images/${imageId}`);
+      
+      // Aktualizace seznamu fotografií
+      const response = await axios.get(`http://localhost:5000/api/meals/${id}/images`);
+      setImages(response.data);
+    } catch (err) {
+      console.error('Chyba při mazání fotografie:', err);
+      alert('Nepodařilo se smazat fotografii');
+    }
+  };
+
+  // Formátování data
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('cs-CZ', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('cs-CZ');
+    } catch (e) {
+      return dateString;
+    }
   };
 
   if (isLoading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Načítání...</p>
-      </div>
-    );
-  }
-  
-  if (error) {
-    return (
-      <div className="error-container">
-        <p className="error-message">{error}</p>
-        <button 
-          className="retry-button"
-          onClick={() => window.location.reload()}
-        >
-          Zkusit znovu
-        </button>
-      </div>
-    );
+    return <div>Načítání...</div>;
   }
 
   return (
-    <div className="gallery-container">
-      <div className="gallery-header">
-        <Link to="/menu" className="back-link">← Zpět na jídelníček</Link>
+    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <Link to="/menu" style={{ color: '#0066FF', textDecoration: 'none' }}>
+          ← Zpět na jídelníček
+        </Link>
         <h1>Galerie jídla</h1>
       </div>
 
       {meal && (
-        <div className="meal-info">
+        <div style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
           <h2>{formatDate(meal.date)}</h2>
           <p>{meal.name}</p>
+          <p style={{ fontSize: '12px', color: '#666' }}>ID jídla: {id}</p>
         </div>
       )}
 
-      <div className="upload-section">
+      <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
         <h3>Přidat fotografii</h3>
-        <form onSubmit={handleSubmit} className="upload-form">
-          <div className="file-input-wrapper">
-            <input
-              type="file"
-              id="fileInput"
-              accept="image/*"
-              onChange={handleFileChange}
-              disabled={uploading}
-            />
-          </div>
-          
+        <form onSubmit={handleSubmit}>
+          <input
+            type="file"
+            id="fileInput"
+            accept="image/*"
+            onChange={handleFileChange}
+            style={{ marginBottom: '10px' }}
+          />
           <button 
             type="submit" 
-            className="upload-button"
-            disabled={!selectedFile || uploading}
+            disabled={!selectedFile}
+            style={{ 
+              padding: '8px 15px', 
+              backgroundColor: '#0066FF', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px' 
+            }}
           >
-            {uploading ? 'Nahrávání...' : 'Nahrát fotografii'}
+            Nahrát fotografii
           </button>
         </form>
       </div>
@@ -170,15 +168,33 @@ const Gallery = () => {
       <h3>Fotografie</h3>
       
       {images.length === 0 ? (
-        <p className="no-images">Galerie je prázdná. Nahrajte první fotografii.</p>
+        <p>Galerie je prázdná. Nahrajte první fotografii.</p>
       ) : (
-        <div className="images-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
           {images.map((image) => (
-            <div key={image.id} className="image-card">
-              <img src={`http://localhost:5000/uploads/${image.image_path}`} alt={meal?.name || 'Jídlo'} />
-              <div className="image-info">
-                <p className="image-date">{formatDate(image.created_at)}</p>
-                <p className="image-author">{image.email}</p>
+            <div key={image.id} style={{ border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
+              <img 
+                src={`http://localhost:5000/uploads/${image.image_path}`} 
+                alt="Fotografie jídla" 
+                style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+              />
+              <div style={{ padding: '10px' }}>
+                <p>{formatDate(image.created_at)}</p>
+                <p>{image.email}</p>
+                <button
+                  onClick={() => handleDeleteImage(image.id)}
+                  style={{
+                    backgroundColor: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '5px 10px',
+                    width: '100%',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Smazat fotografii
+                </button>
               </div>
             </div>
           ))}

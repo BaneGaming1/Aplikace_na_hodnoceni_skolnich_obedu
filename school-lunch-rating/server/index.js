@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const multer = require('multer'); // Potřeba doinstalovat: npm install multer
+const multer = require('multer');
 const { scrapeMeals } = require('./scraper');
 const { pool, testConnection } = require('./db');
 
@@ -59,7 +59,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Získání jídel z jídelníčku
 app.get('/api/meals', async (req, res) => {
   try {
-    // Získáme data přímo ze scraperu
     const meals = await scrapeMeals();
     res.json(meals);
   } catch (error) {
@@ -93,7 +92,7 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
     const mealId = req.body.mealId;
     const userId = req.body.userId;
     
-    console.log('Nahrávání fotografie pro jídlo ID:', mealId);
+    console.log('NAHRÁVÁNÍ FOTOGRAFIE - mealId:', mealId, 'userId:', userId);
     
     if (!mealId || !userId) {
       return res.status(400).json({ error: 'Chybí ID jídla nebo uživatele' });
@@ -103,44 +102,38 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'Žádný soubor nebyl nahrán' });
     }
     
-    // Kontrola, zda jídlo existuje, a pokud ne, vytvoříme ho
-    const [existingMeals] = await pool.query('SELECT id FROM meals WHERE id = ?', [mealId]);
-    
-    if (existingMeals.length === 0) {
-      await pool.query(
-        'INSERT INTO meals (id, date, meal_type, name) VALUES (?, CURDATE(), ?, ?)',
-        [mealId, 'Oběd', 'Jídlo z jídelníčku']
-      );
-    }
-    
-    // Vložení záznamu o fotografii
+    // DŮLEŽITÉ: Už NEKONVERTUJEME mealId na číslo - používáme ho jako string!
     await pool.query(
       'INSERT INTO meal_images (meal_id, user_id, image_path) VALUES (?, ?, ?)',
       [mealId, userId, req.file.filename]
     );
     
-    res.json({ 
-      success: true, 
-      message: 'Fotografie úspěšně nahrána pro jídlo ID: ' + mealId
-    });
+    console.log('Fotografie úspěšně nahrána');
+    res.json({ success: true });
   } catch (error) {
     console.error('Chyba při nahrávání fotografie:', error);
     res.status(500).json({ error: 'Chyba při nahrávání fotografie' });
   }
 });
 
-// Získání fotografií k jídlu
+// Získání fotografií k jídlu - opravený endpoint
 app.get('/api/meals/:mealId/images', async (req, res) => {
   try {
     const mealId = req.params.mealId;
-    console.log('Načítání fotografií pro jídlo ID:', mealId);
     
+    console.log('NAČÍTÁNÍ FOTOGRAFIÍ - mealId:', mealId);
+    
+    // DŮLEŽITÉ: Už NEKONVERTUJEME mealId na číslo - používáme ho jako string!
     const [images] = await pool.query(
-      'SELECT mi.*, u.email FROM meal_images mi JOIN users u ON mi.user_id = u.id WHERE mi.meal_id = ? ORDER BY mi.created_at DESC',
+      'SELECT mi.*, u.email FROM meal_images mi ' +
+      'JOIN users u ON mi.user_id = u.id ' +
+      'WHERE mi.meal_id = ? ' +
+      'ORDER BY mi.created_at DESC',
       [mealId]
     );
     
     console.log('Nalezeno fotografií:', images.length);
+    
     res.json(images);
   } catch (error) {
     console.error('Chyba při načítání fotografií:', error);
@@ -148,52 +141,76 @@ app.get('/api/meals/:mealId/images', async (req, res) => {
   }
 });
 
+// Mazání fotografie autorem
+// Mazání fotografie - ÚPLNĚ NOVÁ VERZE
+app.delete('/api/images/:imageId', async (req, res) => {
+  try {
+    const imageId = req.params.imageId;
+    console.log('Mazání fotografie ID:', imageId);
+    
+    // Najdeme fotku v DB
+    const [images] = await pool.query('SELECT * FROM meal_images WHERE id = ?', [imageId]);
+    
+    if (images.length === 0) {
+      return res.status(404).json({ error: 'Fotografie nebyla nalezena' });
+    }
+    
+    // Smažeme z filesystému
+    try {
+      const imagePath = path.join(__dirname, 'uploads', images[0].image_path);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+        console.log('Soubor smazán:', imagePath);
+      }
+    } catch (err) {
+      console.error('Chyba při mazání souboru:', err);
+      // Pokračujeme i když se soubor nepovede smazat
+    }
+    
+    // Smažeme z databáze
+    await pool.query('DELETE FROM meal_images WHERE id = ?', [imageId]);
+    
+    res.json({ success: true, message: 'Fotografie byla smazána' });
+  } catch (error) {
+    console.error('Chyba při mazání fotografie:', error);
+    res.status(500).json({ error: 'Chyba při mazání fotografie' });
+  }
+});
+
 // === HODNOCENÍ ===
 
-// Přidání hodnocení jídla
+// V server/index.js upravte endpoint pro přidání hodnocení
 app.post('/api/ratings', async (req, res) => {
   try {
     const { mealId, userId, taste, appearance, temperature, portionSize, price, comment } = req.body;
     
-    // Převedeme ID na čísla, pokud jsou poskytnuty jako řetězce
-    const numericMealId = Number(mealId.replace(/[^0-9]/g, '')) || 1;
-    const numericUserId = Number(userId) || 1;
+    console.log('PŘIDÁNÍ HODNOCENÍ - mealId:', mealId, 'userId:', userId);
+    
+    // DŮLEŽITÉ: Už NEKONVERTUJEME mealId na číslo - používáme ho jako string!
     
     // Kontrola, zda už toto hodnocení neexistuje
     const [existingRatings] = await pool.query(
       'SELECT id FROM ratings WHERE meal_id = ? AND user_id = ?',
-      [numericMealId, numericUserId]
+      [mealId, userId]
     );
     
     if (existingRatings && existingRatings.length > 0) {
+      console.log('Uživatel již hodnotil toto jídlo');
       return res.status(400).json({ error: 'Toto jídlo jste již hodnotili' });
-    }
-    
-    // Kontrola, zda jídlo existuje, a pokud ne, vytvoříme ho
-    const [existingMeals] = await pool.query(
-      'SELECT id FROM meals WHERE id = ?',
-      [numericMealId]
-    );
-    
-    if (existingMeals.length === 0) {
-      await pool.query(
-        'INSERT INTO meals (id, date, meal_type, name) VALUES (?, CURDATE(), ?, ?)',
-        [numericMealId, 'Oběd', 'Jídlo z jídelníčku']
-      );
     }
     
     // Přidání hodnocení
     await pool.query(
       'INSERT INTO ratings (meal_id, user_id, taste, appearance, temperature, portion_size, price, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [numericMealId, numericUserId, taste, appearance, temperature, portionSize, price, comment]
+      [mealId, userId, taste, appearance, temperature, portionSize, price, comment]
     );
     
+    console.log('Hodnocení úspěšně přidáno');
     res.json({ success: true });
   } catch (error) {
     console.error('Chyba při hodnocení:', error);
     res.status(500).json({ 
-      error: 'Chyba serveru při ukládání hodnocení: ' + error.message,
-      details: error.toString()
+      error: 'Chyba serveru při ukládání hodnocení: ' + error.message
     });
   }
 });
@@ -215,15 +232,20 @@ app.get('/api/ratings/:mealId', async (req, res) => {
   }
 });
 
-// Kontrola, zda uživatel již hodnotil dané jídlo
+// Kontrola, zda uživatel již hodnotil dané jídlo - KRITICKÁ OPRAVA
 app.get('/api/ratings/check/:mealId/:userId', async (req, res) => {
   try {
     const { mealId, userId } = req.params;
     
+    console.log('KONTROLA HODNOCENÍ - mealId:', mealId, 'userId:', userId);
+    
+    // DŮLEŽITÉ: Už NEKONVERTUJEME mealId na číslo - používáme ho jako string!
     const [ratings] = await pool.query(
       'SELECT id FROM ratings WHERE meal_id = ? AND user_id = ?',
       [mealId, userId]
     );
+    
+    console.log('Nalezeno hodnocení:', ratings.length);
     
     res.json({ hasRated: ratings.length > 0 });
   } catch (error) {
@@ -273,6 +295,45 @@ app.post('/api/login', async (req, res) => {
   } catch (error) {
     console.error('Chyba při přihlašování:', error);
     res.status(500).json({ error: 'Chyba serveru při přihlašování' });
+  }
+});
+
+// Registrace uživatele
+app.post('/api/register', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Validace emailu
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Zadejte platný email' });
+    }
+    
+    // Kontrola domény
+    if (!email.toLowerCase().includes('@spsejecna.cz')) {
+      return res.status(400).json({ error: 'Registrace je povolena pouze se školním emailem (@spsejecna.cz)' });
+    }
+    
+    // Kontrola, zda již uživatel existuje
+    const [existingUsers] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    
+    if (existingUsers.length > 0) {
+      return res.status(400).json({ error: 'Uživatel s tímto emailem již existuje' });
+    }
+    
+    // Vytvoření nového uživatele
+    const [result] = await pool.query(
+      'INSERT INTO users (email, password) VALUES (?, ?)',
+      [email, password]
+    );
+    
+    res.json({ 
+      success: true, 
+      userId: result.insertId,
+      message: 'Registrace proběhla úspěšně'
+    });
+  } catch (error) {
+    console.error('Chyba při registraci:', error);
+    res.status(500).json({ error: 'Chyba serveru při registraci uživatele' });
   }
 });
 
