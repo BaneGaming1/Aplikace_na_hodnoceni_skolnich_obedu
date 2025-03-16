@@ -220,8 +220,13 @@ app.get('/api/ratings/:mealId', async (req, res) => {
   try {
     const mealId = req.params.mealId;
     
+    // Získání všech hodnocení pro dané jídlo včetně emailu uživatele
     const [ratings] = await pool.query(
-      'SELECT * FROM ratings WHERE meal_id = ?',
+      `SELECT r.*, u.email 
+       FROM ratings r
+       LEFT JOIN users u ON r.user_id = u.id
+       WHERE r.meal_id = ?
+       ORDER BY r.created_at DESC`,
       [mealId]
     );
     
