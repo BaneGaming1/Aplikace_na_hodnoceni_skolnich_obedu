@@ -96,7 +96,6 @@ const Menu = () => {
     }
     
     // Seřadíme podle vzdálenosti od dnešního dne
-    // Dnešek (0) na začátek, následující dny (1, 2, 3...) po něm, předchozí dny (-1, -2...) na konec
     dateArray.sort((a, b) => {
       // Přednostně řadíme podle toho, jestli je datum dnes, v budoucnu nebo v minulosti
       if ((a.diffDays >= 0 && b.diffDays >= 0) || (a.diffDays < 0 && b.diffDays < 0)) {
@@ -133,7 +132,7 @@ const Menu = () => {
     <div className="error-container">
       <p className="error-message">{error}</p>
       <button 
-        className="retry-button"
+        className="btn btn-primary"
         onClick={() => window.location.reload()}
       >
         Zkusit znovu
@@ -146,7 +145,7 @@ const Menu = () => {
     return (
       <div className="no-data-container">
         <p>Pro tento týden nejsou k dispozici žádná data o jídelníčku.</p>
-        <button onClick={handleLogout} className="logout-button">
+        <button onClick={handleLogout} className="btn btn-logout">
           Odhlásit se
         </button>
       </div>
@@ -159,7 +158,7 @@ const Menu = () => {
         <h1>Jídelníček</h1>
         <div className="user-info">
           <p>Přihlášen jako: {localStorage.getItem('userEmail') || 'D@D'}</p>
-          <button onClick={handleLogout} className="logout-button">
+          <button onClick={handleLogout} className="btn btn-logout">
             Odhlásit se
           </button>
         </div>
@@ -174,23 +173,32 @@ const Menu = () => {
                 <div key={meal.id} className="meal-card">
                   <h3>{meal.type}</h3>
                   <p className="meal-name">{meal.name}</p>
-                  <div className="button-group">
+                  <div className="meal-actions">
                     <button
-                      className="rate-button"
+                      className="btn btn-primary"
                       onClick={() => navigate(`/rating/${meal.id}`, { 
                         state: { meal, dayTitle } 
                       })}
                     >
                       Ohodnotit
                     </button>
-                    <button
-                      className="gallery-button"
-                      onClick={() => {
-                        console.log('Navigace do galerie pro jídlo ID:', meal.id);
-                        navigate(`/gallery/${meal.id}`);
-                      }}
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={() => navigate(`/gallery/${meal.id}`, {
+                        state: { meal, dayTitle }
+                      })}
                     >
                       Galerie
+                    </button>
+                  </div>
+                  <div className="meal-ratings-link">
+                    <button
+                      className="btn btn-text"
+                      onClick={() => navigate(`/ratings-summary/${meal.id}`, {
+                        state: { meal, dayTitle }
+                      })}
+                    >
+                      Zobrazit hodnocení
                     </button>
                   </div>
                 </div>
