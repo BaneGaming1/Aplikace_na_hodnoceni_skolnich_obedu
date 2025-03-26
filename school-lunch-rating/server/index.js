@@ -67,6 +67,131 @@ app.get('/api/meals', async (req, res) => {
   }
 });
 
+// Upravený endpoint pro ověření přihlášení s akceptováním dat z různých zdrojů
+// Přidejte do server/index.js
+
+const axios = require('axios');
+const cheerio = require('cheerio');
+
+// CORS middleware - přidejte před všechny routy
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, X-USERNAME, X-PASSWORD');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+// Endpoint pro iCanteen přihlášení s podporou různých formátů požadavku
+app.post('/api/icanteen-login', async (req, res) => {
+  console.log('Received login request');
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  
+  // Zkusíme získat username a password z různých zdrojů
+  let username, password;
+  
+  // 1. Zkusíme získat z hlaviček (X-USERNAME, X-PASSWORD)
+  if (req.headers['x-username'] && req.headers['x-password']) {
+    username = req.headers['x-username'];
+    password = req.headers['x-password'];
+  } 
+  // 2. Zkusíme získat z těla požadavku
+  else if (req.body && (req.body.username || req.body.email) && req.body.password) {
+    username = req.body.username || req.body.email;
+    password = req.body.password;
+  }
+  
+  // Kontrola, zda byly poskytnuty přihlašovací údaje
+  if (!username || !password) {
+    console.log('Missing credentials');
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Chybí přihlašovací údaje'
+    });
+  }
+  
+  try {
+    console.log(`Attempting to verify credentials for: ${username}`);
+    
+    // Pro vývoj: povolíme testovací přihlášení
+    if (username === 'test' && password === 'test') {
+      console.log('Test login successful');
+      return res.status(200).json({
+        success: true,
+        userId: 'test-user-id',
+        username: username
+      });
+    }
+    
+    // Pokus o ověření přes iCanteen
+    try {
+      // Načtení přihlašovací stránky pro získání CSRF tokenu
+      const loginPage = await axios.get('https://strav.nasejidelna.cz/0341/login');
+      const $ = cheerio.load(loginPage.data);
+      const csrf = $('input[name="_csrf"]').val();
+      
+      if (!csrf) {
+        console.log('Failed to get CSRF token');
+        return res.status(500).json({
+          success: false,
+          error: 'Nepodařilo se načíst přihlašovací stránku'
+        });
+      }
+      
+      // Sestavení přihlašovacího formuláře
+      const formData = new URLSearchParams();
+      formData.append('j_username', username);
+      formData.append('j_password', password);
+      formData.append('_csrf', csrf);
+      
+      // Odeslání přihlášení
+      const loginResponse = await axios.post(
+        'https://strav.nasejidelna.cz/0341/j_spring_security_check',
+        formData.toString(),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Referer': 'https://strav.nasejidelna.cz/0341/login'
+          },
+          maxRedirects: 0,
+          validateStatus: () => true
+        }
+      );
+      
+      // Úspěšné přihlášení vrací přesměrování (302)
+      if (loginResponse.status === 302) {
+        console.log('iCanteen login successful');
+        // Úspěšné přihlášení - vrátíme potřebná data pro frontend
+        return res.status(200).json({
+          success: true,
+          userId: Buffer.from(`${username}_${Date.now()}`).toString('base64'),
+          username: username
+        });
+      } else {
+        console.log('iCanteen login failed');
+        // Neúspěšné přihlášení
+        return res.status(401).json({
+          success: false,
+          error: 'Neplatné přihlašovací údaje'
+        });
+      }
+    } catch (canteenError) {
+      console.error('iCanteen connection error:', canteenError);
+      return res.status(500).json({
+        success: false,
+        error: 'Chyba při komunikaci se serverem jídelny'
+      });
+    }
+  } catch (error) {
+    console.error('General login error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Neočekávaná chyba serveru'
+    });
+  }
+});
+
 // Získání detailu konkrétního jídla
 app.get('/api/meals/:id', async (req, res) => {
   try {
