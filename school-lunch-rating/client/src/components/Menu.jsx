@@ -19,7 +19,7 @@ const Menu = () => {
     const fetchMeals = async () => {
       try {
         // Získáme data o jídlech z API
-        const response = await axios.get('http://localhost:5000/api/meals');
+        const response = await axios.get('/api/meals');
         
         // Odfiltrujeme duplicity a setřídíme data podle data
         const cleanedData = removeDuplicateMeals(response.data);

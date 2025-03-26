@@ -25,7 +25,7 @@ const RatingsSummary = () => {
     const fetchRatings = async () => {
       try {
         console.log("Načítám hodnocení pro ID:", params.id);
-        const response = await axios.get(`http://localhost:5000/api/ratings/${params.id}`);
+        const response = await axios.get(`/api/ratings/${params.id}`);
         console.log("Načtená data:", response.data);
         setRatings(response.data);
       } catch (error) {

@@ -25,7 +25,7 @@ const Gallery = () => {
         
         // Načtení informací o jídle
         try {
-          const mealResponse = await axios.get(`http://localhost:5000/api/meals/${id}`);
+          const mealResponse = await axios.get(`/api/meals/${id}`);
           setMeal(mealResponse.data);
         } catch (err) {
           // Pokud jídlo není v DB, nastavíme základní údaje
@@ -37,7 +37,7 @@ const Gallery = () => {
         }
         
         // Načtení fotografií konkrétního jídla
-        const imagesResponse = await axios.get(`http://localhost:5000/api/meals/${id}/images`);
+        const imagesResponse = await axios.get(`/api/meals/${id}/images`);
         setImages(imagesResponse.data);
         console.log('Načteno fotografií:', imagesResponse.data.length);
         
@@ -71,12 +71,12 @@ const Gallery = () => {
     formData.append('userId', localStorage.getItem('userId'));
     
     try {
-      await axios.post('http://localhost:5000/api/upload-image', formData, {
+      await axios.post('/api/upload-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
       // Po úspěšném nahrání obnovíme seznam
-      const response = await axios.get(`http://localhost:5000/api/meals/${id}/images`);
+      const response = await axios.get(`/api/meals/${id}/images`);
       setImages(response.data);
       
       // Reset formuláře
@@ -95,10 +95,10 @@ const Gallery = () => {
     }
     
     try {
-      await axios.delete(`http://localhost:5000/api/images/${imageId}`);
+      await axios.delete(`/api/images/${imageId}`);
       
       // Aktualizace seznamu fotografií
-      const response = await axios.get(`http://localhost:5000/api/meals/${id}/images`);
+      const response = await axios.get(`/api/meals/${id}/images`);
       setImages(response.data);
     } catch (err) {
       console.error('Chyba při mazání fotografie:', err);
@@ -174,7 +174,7 @@ const Gallery = () => {
           {images.map((image) => (
             <div key={image.id} style={{ border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
               <img 
-                src={`http://localhost:5000/uploads/${image.image_path}`} 
+                src={`/uploads/${image.image_path}`} 
                 alt="Fotografie jídla" 
                 style={{ width: '100%', height: '200px', objectFit: 'cover' }}
               />

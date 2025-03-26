@@ -26,7 +26,7 @@ const Login = () => {
       }
 
       const endpoint = isLogin ? 'login' : 'register';
-      const response = await axios.post(`http://localhost:5000/api/${endpoint}`, credentials);
+      const response = await axios.post(`/api/${endpoint}`, credentials);
       
       if (response.data.success) {
         // Uložíme ID uživatele do localStorage pro další použití

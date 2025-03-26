@@ -31,7 +31,7 @@ const Rating = () => {
   const fetchAllRatings = useCallback(async () => {
     try {
       console.log("Načítám hodnocení pro jídlo ID:", params.id);
-      const response = await axios.get(`http://localhost:5000/api/ratings/${params.id}`);
+      const response = await axios.get(`/api/ratings/${params.id}`);
       console.log("Načtená data:", response.data);
       setAllRatings(response.data);
     } catch (error) {
@@ -51,7 +51,7 @@ const Rating = () => {
         }
 
         const response = await axios.get(
-          `http://localhost:5000/api/ratings/check/${params.id}/${userId}`
+          `/api/ratings/check/params.id/{params.id}/params.id/{userId}`
         );
         
         if (response.data.hasRated) {
@@ -94,7 +94,7 @@ const Rating = () => {
         comment: rating.comment
       };
 
-      await axios.post('http://localhost:5000/api/ratings', ratingData);
+      await axios.post('/api/ratings', ratingData);
       
       setSuccess(true);
       

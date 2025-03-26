@@ -6,23 +6,18 @@ const multer = require('multer');
 const { scrapeMeals } = require('./scraper');
 const { pool, testConnection } = require('./db');
 
-// Inicializace Express aplikace
 const app = express();
 
-// Povolení CORS pro frontend
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
 
-// Parsování JSON v požadavcích
 app.use(express.json());
 
-// Test připojení k databázi při startu serveru
 testConnection();
 
-// Konfigurace multer pro nahrávání obrázků
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, 'uploads');
@@ -45,18 +40,12 @@ const upload = multer({
     }
   },
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
+    fileSize: 5 * 1024 * 1024
   }
 });
 
-// Statické servírování složky uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ==================== API ENDPOINTY ====================
-
-// === JÍDLA ===
-
-// Získání jídel z jídelníčku
 app.get('/api/meals', async (req, res) => {
   try {
     const meals = await scrapeMeals();
@@ -67,7 +56,6 @@ app.get('/api/meals', async (req, res) => {
   }
 });
 
-// Získání detailu konkrétního jídla
 app.get('/api/meals/:id', async (req, res) => {
   try {
     const mealId = req.params.id;
@@ -84,9 +72,6 @@ app.get('/api/meals/:id', async (req, res) => {
   }
 });
 
-// === FOTOGRAFIE ===
-
-// Nahrání fotografie jídla
 app.post('/api/upload-image', upload.single('image'), async (req, res) => {
   try {
     const mealId = req.body.mealId;
@@ -102,7 +87,6 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'Žádný soubor nebyl nahrán' });
     }
     
-    // DŮLEŽITÉ: Už NEKONVERTUJEME mealId na číslo - používáme ho jako string!
     await pool.query(
       'INSERT INTO meal_images (meal_id, user_id, image_path) VALUES (?, ?, ?)',
       [mealId, userId, req.file.filename]
@@ -116,14 +100,12 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
   }
 });
 
-// Získání fotografií k jídlu - opravený endpoint
 app.get('/api/meals/:mealId/images', async (req, res) => {
   try {
     const mealId = req.params.mealId;
     
     console.log('NAČÍTÁNÍ FOTOGRAFIÍ - mealId:', mealId);
     
-    // DŮLEŽITÉ: Už NEKONVERTUJEME mealId na číslo - používáme ho jako string!
     const [images] = await pool.query(
       'SELECT mi.*, u.email FROM meal_images mi ' +
       'JOIN users u ON mi.user_id = u.id ' +
@@ -141,21 +123,17 @@ app.get('/api/meals/:mealId/images', async (req, res) => {
   }
 });
 
-// Mazání fotografie autorem
-// Mazání fotografie - ÚPLNĚ NOVÁ VERZE
 app.delete('/api/images/:imageId', async (req, res) => {
   try {
     const imageId = req.params.imageId;
     console.log('Mazání fotografie ID:', imageId);
     
-    // Najdeme fotku v DB
     const [images] = await pool.query('SELECT * FROM meal_images WHERE id = ?', [imageId]);
     
     if (images.length === 0) {
       return res.status(404).json({ error: 'Fotografie nebyla nalezena' });
     }
     
-    // Smažeme z filesystému
     try {
       const imagePath = path.join(__dirname, 'uploads', images[0].image_path);
       if (fs.existsSync(imagePath)) {
@@ -164,10 +142,8 @@ app.delete('/api/images/:imageId', async (req, res) => {
       }
     } catch (err) {
       console.error('Chyba při mazání souboru:', err);
-      // Pokračujeme i když se soubor nepovede smazat
     }
     
-    // Smažeme z databáze
     await pool.query('DELETE FROM meal_images WHERE id = ?', [imageId]);
     
     res.json({ success: true, message: 'Fotografie byla smazána' });
@@ -177,18 +153,12 @@ app.delete('/api/images/:imageId', async (req, res) => {
   }
 });
 
-// === HODNOCENÍ ===
-
-// V server/index.js upravte endpoint pro přidání hodnocení
 app.post('/api/ratings', async (req, res) => {
   try {
     const { mealId, userId, taste, appearance, temperature, portionSize, price, comment } = req.body;
     
     console.log('PŘIDÁNÍ HODNOCENÍ - mealId:', mealId, 'userId:', userId);
     
-    // DŮLEŽITÉ: Už NEKONVERTUJEME mealId na číslo - používáme ho jako string!
-    
-    // Kontrola, zda už toto hodnocení neexistuje
     const [existingRatings] = await pool.query(
       'SELECT id FROM ratings WHERE meal_id = ? AND user_id = ?',
       [mealId, userId]
@@ -199,7 +169,6 @@ app.post('/api/ratings', async (req, res) => {
       return res.status(400).json({ error: 'Toto jídlo jste již hodnotili' });
     }
     
-    // Přidání hodnocení
     await pool.query(
       'INSERT INTO ratings (meal_id, user_id, taste, appearance, temperature, portion_size, price, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [mealId, userId, taste, appearance, temperature, portionSize, price, comment]
@@ -215,12 +184,10 @@ app.post('/api/ratings', async (req, res) => {
   }
 });
 
-// Získání hodnocení pro konkrétní jídlo
 app.get('/api/ratings/:mealId', async (req, res) => {
   try {
     const mealId = req.params.mealId;
     
-    // Získání všech hodnocení pro dané jídlo včetně emailu uživatele
     const [ratings] = await pool.query(
       `SELECT r.*, u.email 
        FROM ratings r
@@ -237,14 +204,12 @@ app.get('/api/ratings/:mealId', async (req, res) => {
   }
 });
 
-// Kontrola, zda uživatel již hodnotil dané jídlo - KRITICKÁ OPRAVA
 app.get('/api/ratings/check/:mealId/:userId', async (req, res) => {
   try {
     const { mealId, userId } = req.params;
     
     console.log('KONTROLA HODNOCENÍ - mealId:', mealId, 'userId:', userId);
     
-    // DŮLEŽITÉ: Už NEKONVERTUJEME mealId na číslo - používáme ho jako string!
     const [ratings] = await pool.query(
       'SELECT id FROM ratings WHERE meal_id = ? AND user_id = ?',
       [mealId, userId]
@@ -259,37 +224,29 @@ app.get('/api/ratings/check/:mealId/:userId', async (req, res) => {
   }
 });
 
-// === UŽIVATELÉ ===
-
-// Přihlášení uživatele
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    // Jednoduchá validace, že email má správný formát
     if (!email || !email.includes('@')) {
       return res.status(401).json({ error: 'Zadejte platný email' });
     }
     
-    // Kontrola, že email obsahuje doménu školy
     if (!email.toLowerCase().includes('@spsejecna.cz')) {
       return res.status(401).json({ error: 'Přihlášení je povoleno pouze se školním emailem (@spsejecna.cz)' });
     }
     
-    // Kontrola, zda uživatel existuje
     const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
     
     let userId;
     
     if (users.length === 0) {
-      // Uživatel neexistuje, vytvoříme ho
       const [result] = await pool.query(
         'INSERT INTO users (email, password) VALUES (?, ?)',
         [email, password]
       );
       userId = result.insertId;
     } else {
-      // Uživatel existuje, ověříme heslo
       if (users[0].password !== password) {
         return res.status(401).json({ error: 'Nesprávné heslo' });
       }
@@ -303,29 +260,24 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Registrace uživatele
 app.post('/api/register', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    // Validace emailu
     if (!email || !email.includes('@')) {
       return res.status(400).json({ error: 'Zadejte platný email' });
     }
     
-    // Kontrola domény
     if (!email.toLowerCase().includes('@spsejecna.cz')) {
       return res.status(400).json({ error: 'Registrace je povolena pouze se školním emailem (@spsejecna.cz)' });
     }
     
-    // Kontrola, zda již uživatel existuje
     const [existingUsers] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
     
     if (existingUsers.length > 0) {
       return res.status(400).json({ error: 'Uživatel s tímto emailem již existuje' });
     }
     
-    // Vytvoření nového uživatele
     const [result] = await pool.query(
       'INSERT INTO users (email, password) VALUES (?, ?)',
       [email, password]
@@ -342,10 +294,16 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Port, na kterém bude server běžet
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../client/build')));
+  
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+  });
+}
+
 const PORT = process.env.PORT || 5000;
 
-// Spuštění serveru
 app.listen(PORT, () => {
   console.log(`Server běží na portu ${PORT}`);
 });
