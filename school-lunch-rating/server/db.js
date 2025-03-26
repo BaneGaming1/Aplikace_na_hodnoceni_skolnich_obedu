@@ -1,9 +1,7 @@
 // server/db.js
 const mysql = require('mysql2/promise');
 
-const pool = mysql.createPool(process.env.JAWSDB_URL ? {
-  uri: process.env.JAWSDB_URL
-} : {
+const pool = mysql.createPool({
   host: 'thastertyn.xyz',
   user: 'sivek',  
   password: 'sivek1234', 
