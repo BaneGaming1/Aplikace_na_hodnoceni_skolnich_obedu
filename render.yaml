@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: lunch-rating-app
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    disk:
+      name: lunch-uploads
+      mountPath: /opt/render/project/src/uploads
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RENDER_DISK_PATH
+        value: /opt/render/project/src/uploads
