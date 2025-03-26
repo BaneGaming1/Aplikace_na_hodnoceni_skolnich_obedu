@@ -20,7 +20,11 @@ testConnection();
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'uploads');
+    // Pokud jsme na Render, použijeme jejich disk
+    const uploadDir = process.env.RENDER_DISK_PATH 
+      ? path.join(process.env.RENDER_DISK_PATH, 'uploads')
+      : path.join(__dirname, 'uploads');
+    
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
     cb(null, uploadDir);
   },
@@ -44,7 +48,11 @@ const upload = multer({
   }
 });
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(
+  process.env.RENDER_DISK_PATH 
+    ? path.join(process.env.RENDER_DISK_PATH, 'uploads')
+    : path.join(__dirname, 'uploads')
+));
 
 app.get('/api/meals', async (req, res) => {
   try {
