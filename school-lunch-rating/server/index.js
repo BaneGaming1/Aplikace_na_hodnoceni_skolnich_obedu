@@ -198,70 +198,74 @@ app.post('/api/icanteen-login', async (req, res) => {
     const username = req.headers['x-username'];
     const password = req.headers['x-password'];
     
-    // Kontrola údajů
+    // Základní validace vstupu
     if (!username || !password) {
-      return res.status(400).send('Chybí přihlašovací údaje');
-    }
-    
-    // Testovací přihlášení pro vývoj
-    if (username === 'test' && password === 'test') {
-      return res.status(200).json({
-        success: true,
-        userId: 'test123',
-        username: 'test'
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Chybí přihlašovací údaje' 
       });
     }
     
-    // Ověření proti iCanteen
-    try {
-      // Načtení přihlašovací stránky pro získání CSRF tokenu
-      const loginPage = await axios.get('https://strav.nasejidelna.cz/0341/login');
-      const $ = cheerio.load(loginPage.data);
-      const csrf = $('input[name="_csrf"]').val();
-      
-      if (!csrf) {
-        return res.status(500).send('Nepodařilo se načíst přihlašovací stránku');
+    // Načtení přihlašovací stránky pro získání CSRF tokenu
+    const loginPageResponse = await axios.get('https://strav.nasejidelna.cz/0341/login', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
-      
-      // Sestavení přihlašovacího formuláře
-      const formData = new URLSearchParams();
-      formData.append('j_username', username);
-      formData.append('j_password', password);
-      formData.append('_csrf', csrf);
-      
-      // Odeslání přihlášení
-      const loginResponse = await axios.post(
-        'https://strav.nasejidelna.cz/0341/j_spring_security_check',
-        formData.toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Referer': 'https://strav.nasejidelna.cz/0341/login'
-          },
-          maxRedirects: 0,
-          validateStatus: () => true
-        }
-      );
-      
-      // Úspěšné přihlášení vrací přesměrování (302)
-      if (loginResponse.status === 302) {
-        // Přihlášení úspěšné
-        return res.status(200).json({
-          success: true,
-          userId: Buffer.from(`${username}_${Date.now()}`).toString('base64'),
-          username: username
-        });
-      } else {
-        // Přihlášení neúspěšné
-        return res.status(401).send('Neplatné přihlašovací údaje');
+    });
+    
+    const $ = cheerio.load(loginPageResponse.data);
+    const csrf = $('input[name="_csrf"]').val();
+    
+    if (!csrf) {
+      return res.status(500).json({
+        success: false,
+        error: 'Nepodařilo se načíst přihlašovací stránku'
+      });
+    }
+    
+    // Sestavení přihlašovacího formuláře
+    const formData = new URLSearchParams();
+    formData.append('j_username', username);
+    formData.append('j_password', password);
+    formData.append('_csrf', csrf);
+    
+    // Odeslání přihlášení
+    const loginResponse = await axios.post(
+      'https://strav.nasejidelna.cz/0341/j_spring_security_check',
+      formData.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': 'https://strav.nasejidelna.cz/0341/login',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        maxRedirects: 0,
+        validateStatus: () => true
       }
-    } catch (error) {
-      console.error('Chyba při ověřování:', error);
-      return res.status(500).send('Chyba při komunikaci se serverem jídelny');
+    );
+    
+    // Vyhodnocení odpovědi
+    if (loginResponse.status === 302) {
+      // Přihlášení úspěšné (server vrací přesměrování)
+      return res.json({
+        success: true,
+        userId: Buffer.from(`${username}_${Date.now()}`).toString('base64'),
+        username: username
+      });
+    } else {
+      // Přihlášení neúspěšné
+      return res.status(401).json({
+        success: false,
+        error: 'Neplatné přihlašovací údaje'
+      });
     }
   } catch (error) {
-    console.error('Obecná chyba:', error);
-    return res.status(500).send('Chyba serveru');
+    console.error('Chyba při přihlašování:', error);
+    
+    return res.status(500).json({
+      success: false,
+      error: 'Chyba při komunikaci se serverem jídelny'
+    });
   }
 });
 
