@@ -1,20 +1,20 @@
 {
   "name": "school-lunch-rating",
   "version": "1.0.0",
-  "description": "Aplikace pro hodnocení školních obědů",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "build": "cd client && yarn && yarn build",
-    "dev": "concurrently \"yarn server\" \"yarn client\"",
+    "build": "cd client && npm install && npm run build",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "nodemon server/index.js",
-    "client": "cd client && yarn start"
-  },
-  "engines": {
-    "node": ">=14.0.0"
+    "client": "cd client && npm start"
   },
   "dependencies": {
     "concurrently": "^7.0.0",
     "nodemon": "^2.0.15"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
+
