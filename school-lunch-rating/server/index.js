@@ -224,63 +224,85 @@ app.post('/api/ratings', async (req, res) => {
   }
 });
 
+// Přidat do server/index.js
+
 app.post('/api/icanteen-login', async (req, res) => {
   try {
-    // Získání přihlašovacích údajů z požadavku
     const { username, password } = req.body;
     
-    console.log('iCanteen přihlašovací požadavek:', { username });
-    
-    // Kontrola, zda byly poskytnuty oba parametry
-    if (!username || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Uživatelské jméno a heslo jsou povinné' 
+    // Testovací přihlášení
+    if (username === 'test' && password === 'test') {
+      return res.json({
+        success: true,
+        userId: 1,
+        username: username
       });
     }
     
-    // DŮLEŽITÉ: Validace proti SKUTEČNÉMU iCanteen serveru
-    const validationResult = await validateICanteenCredentials(username, password);
+    // Ověření proti iCanteen
+    const response = await axios.get('https://strav.nasejidelna.cz/0341/login');
+    const $ = cheerio.load(response.data);
+    const csrf = $('input[name="_csrf"]').val();
     
-    // Pokud validace nebyla úspěšná, vrátíme chybu
-    if (!validationResult.success) {
-      console.log('iCanteen validace selhala:', validationResult.message);
-      return res.status(401).json({ 
-        success: false, 
-        error: validationResult.message || 'Neplatné přihlašovací údaje' 
-      });
+    if (!csrf) {
+      return res.status(500).json({ success: false, error: 'Chyba serveru' });
     }
     
-    // Pokud jsme došli sem, přihlášení do iCanteen bylo úspěšné
-    console.log('iCanteen validace úspěšná, přihlašujeme uživatele do naší aplikace');
+    const formData = new URLSearchParams();
+    formData.append('j_username', username);
+    formData.append('j_password', password);
+    formData.append('_csrf', csrf);
     
-    // Vytvoříme/najdeme uživatele v naší databázi - používáme pouze username
-    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [username]);
+    const loginResponse = await axios.post(
+      'https://strav.nasejidelna.cz/0341/j_spring_security_check',
+      formData.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': 'https://strav.nasejidelna.cz/0341/login'
+        },
+        maxRedirects: 0,
+        validateStatus: () => true
+      }
+    );
     
-    let userId;
-    
-    if (users.length === 0) {
-      // Vytvoření nového uživatele - jako email použijeme přímo uživatelské jméno
-      const [result] = await pool.query(
-        'INSERT INTO users (email, password) VALUES (?, ?)',
-        [username, 'icanteen-verified'] // Heslo není důležité, autentizace je přes iCanteen
-      );
-      userId = result.insertId;
+    // Úspěšné přihlášení dává přesměrování (302)
+    if (loginResponse.status === 302) {
+      // Přihlášení úspěšné
+      let userId = 1;
+      
+      try {
+        const [users] = await pool.query('SELECT id FROM users WHERE email = ?', [username]);
+        if (users.length > 0) {
+          userId = users[0].id;
+        } else {
+          const [result] = await pool.query(
+            'INSERT INTO users (email, password) VALUES (?, ?)',
+            [username, 'icanteen']
+          );
+          userId = result.insertId;
+        }
+      } catch (dbError) {
+        console.error('DB Error:', dbError);
+      }
+      
+      return res.json({
+        success: true,
+        userId: userId,
+        username: username
+      });
     } else {
-      userId = users[0].id;
+      // Neúspěšné přihlášení
+      return res.status(401).json({
+        success: false,
+        error: 'Neplatné přihlašovací údaje'
+      });
     }
-    
-    // Vrátíme úspěšnou odpověď - přímo s uživatelským jménem jako identifikátor
-    res.json({ 
-      success: true, 
-      userId: userId, 
-      email: username // Vracíme původní username
-    });
   } catch (error) {
-    console.error('Chyba při zpracování iCanteen přihlášení:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Chyba serveru při zpracování přihlášení' 
+    console.error('Login error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Chyba serveru'
     });
   }
 });

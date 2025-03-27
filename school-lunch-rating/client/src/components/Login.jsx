@@ -4,13 +4,11 @@ import axios from 'axios';
 
 const Login = () => {
   const [credentials, setCredentials] = useState({
-    email: '',
+    username: '',
     password: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isLogin, setIsLogin] = useState(true);
-  const [isICanteenLogin, setIsICanteenLogin] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -19,20 +17,16 @@ const Login = () => {
     setError('');
     
     try {
-      // Odesíláme přihlašovací údaje na iCanteen endpoint
-      const response = await axios.post('/api/icanteen-login', {
-        username: credentials.email, // přestože používáme "email" jako název pole v UI, je to uživatelské jméno z iCanteen
-        password: credentials.password
-      });
+      // Pokusíme se přihlásit do systému iCanteen
+      const response = await axios.post('http://localhost:5000/api/icanteen-login', credentials);
       
-      // Zpracování odpovědi
       if (response.data.success) {
-        // Uložení údajů do localStorage pro další použití
+        // Přihlášení bylo úspěšné
         localStorage.setItem('userId', response.data.userId);
-        localStorage.setItem('userEmail', response.data.email); // Původní uživatelské jméno
-        
-        // Přesměrování na jídelníček
+        localStorage.setItem('userEmail', response.data.username || response.data.email);
         navigate('/menu');
+      } else {
+        setError(response.data.error || 'Přihlášení se nezdařilo');
       }
     } catch (error) {
       console.error('Chyba při přihlašování:', error);
@@ -40,55 +34,44 @@ const Login = () => {
       if (error.response && error.response.data && error.response.data.error) {
         setError(error.response.data.error);
       } else {
-        setError('Nepodařilo se přihlásit. Zkuste to prosím později.');
+        setError('Chyba při komunikaci se serverem. Zkuste to prosím později.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleAuthMode = () => {
-    setIsLogin(!isLogin);
-    setError('');
-  };
-
-  const toggleLoginType = () => {
-    setIsICanteenLogin(!isICanteenLogin);
-    setError('');
-    // Reset pole při přepnutí typu přihlášení
-    setCredentials({
-      email: '',
-      password: ''
-    });
-  };
-
   return (
     <div className="login-page">
       <div className="login-container">
         <div className="login-header">
-          <h1>{isICanteenLogin ? 'Přihlášení přes iCanteen' : 'Přihlášení'}</h1>
-          <p className="login-subtitle">Systém hodnocení školních obědů</p>
+          <h1>Přihlášení do systému</h1>
+          <p className="login-subtitle">Hodnocení školních obědů</p>
         </div>
         
         <div className="login-form-container">
           {error && <div className="login-error">{error}</div>}
           
-          {isICanteenLogin && (
-            <div className="icanteen-info" style={{ margin: '10px 0', padding: '10px', backgroundColor: '#f0f8ff', borderRadius: '5px', fontSize: '14px' }}>
-              Použijte stejné přihlašovací údaje jako do systému jídelny.<br />
-              Pro testování můžete použít: <strong>test / test</strong>
-            </div>
-          )}
+          <div className="login-info" style={{
+            margin: '10px 0',
+            padding: '12px',
+            backgroundColor: '#f0f8ff',
+            borderRadius: '5px',
+            fontSize: '14px'
+          }}>
+            Pro přihlášení použijte vaše přihlašovací údaje do systému iCanteen.<br />
+            Pro testování můžete použít: <strong>test / test</strong>
+          </div>
           
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
-              <label htmlFor="email">{isICanteenLogin ? 'Uživatelské jméno iCanteen' : 'Školní email'}</label>
+              <label htmlFor="username">Přihlašovací jméno iCanteen</label>
               <input
-                type={isICanteenLogin ? "text" : "email"}
-                id="email"
-                value={credentials.email}
-                onChange={(e) => setCredentials({...credentials, email: e.target.value})}
-                placeholder={isICanteenLogin ? 'Zadejte uživatelské jméno' : 'jmeno.prijmeni@spsejecna.cz'}
+                type="text"
+                id="username"
+                value={credentials.username}
+                onChange={(e) => setCredentials({...credentials, username: e.target.value})}
+                placeholder="Vaše přihlašovací jméno"
                 required
                 className="login-input"
               />
@@ -101,7 +84,7 @@ const Login = () => {
                 id="password"
                 value={credentials.password}
                 onChange={(e) => setCredentials({...credentials, password: e.target.value})}
-                placeholder="Zadejte heslo"
+                placeholder="Vaše heslo do iCanteen"
                 required
                 className="login-input"
               />
@@ -112,32 +95,15 @@ const Login = () => {
               className="login-button"
               disabled={loading}
             >
-              {loading ? 'Prosím čekejte...' : (isICanteenLogin 
-                ? 'Přihlásit se přes iCanteen'
-                : (isLogin ? 'Přihlásit se' : 'Zaregistrovat se'))}
+              {loading ? 'Ověřuji přihlášení...' : 'Přihlásit se'}
             </button>
           </form>
 
-          <div className="login-type-toggle" style={{ textAlign: 'center', marginTop: '15px', marginBottom: '10px' }}>
-            <button 
-              onClick={toggleLoginType} 
-              className="toggle-auth-btn"
-              type="button"
-            >
-              {isICanteenLogin ? 'Přepnout na standardní přihlášení' : 'Přepnout na iCanteen přihlášení'}
-            </button>
+          <div className="login-footer">
+            <p>
+              Použijte své přihlašovací údaje ze systému školní jídelny.
+            </p>
           </div>
-
-          {!isICanteenLogin && (
-            <div className="login-footer">
-              <p>
-                {isLogin ? 'Nemáte účet?' : 'Máte již účet?'} 
-                <button onClick={toggleAuthMode} className="toggle-auth-btn">
-                  {isLogin ? 'Zaregistrovat se' : 'Přihlásit se'}
-                </button>
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>
