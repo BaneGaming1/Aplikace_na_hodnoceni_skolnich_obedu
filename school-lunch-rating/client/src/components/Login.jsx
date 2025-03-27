@@ -13,7 +13,7 @@ const Login = () => {
     e.preventDefault();
     
     if (!username || !password) {
-      setError('Zadejte prosím uživatelské jméno a heslo.');
+      setError('Zadejte přihlašovací údaje');
       return;
     }
     
@@ -21,40 +21,29 @@ const Login = () => {
     setError('');
     
     try {
-      // ŽÁDNÉ obcházení ověřování zde
-      const response = await axios({
-        method: 'POST',
-        url: '/api/icanteen-login',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-USERNAME': username,
-          'X-PASSWORD': password
-        },
-        data: {
-          username,
-          password
-        }
+      // Pokus o přihlášení
+      const response = await axios.post('/api/icanteen-login', { 
+        username, 
+        password 
       });
       
-      // Přihlášení bylo úspěšné POUZE když server vrátí success: true
-      if (response.data && response.data.success) {
+      if (response.data.success) {
+        // Přihlášení uspělo
         localStorage.setItem('userId', response.data.userId);
         localStorage.setItem('userEmail', username);
         navigate('/menu');
       } else {
-        // Toto by nemělo nikdy nastat, server by měl vracet HTTP chybu při neúspěchu
-        setError('Přihlášení selhalo. Zkontrolujte své údaje.');
+        // Přihlášení selhalo
+        setError('Přihlášení selhalo');
       }
     } catch (error) {
-      console.error('Chyba při přihlašování:', error);
+      console.error('Chyba:', error);
       
-      // Server vrátil chybu - NEPOUŠTÍME uživatele dál
-      if (error.response?.status === 401) {
-        setError('Neplatné přihlašovací údaje. Zkontrolujte své uživatelské jméno a heslo.');
-      } else if (error.response?.data?.error) {
+      // Zobrazení chyby z API nebo obecné chyby
+      if (error.response?.data?.error) {
         setError(error.response.data.error);
       } else {
-        setError('Chyba při komunikaci se serverem. Zkuste to prosím znovu.');
+        setError('Neplatné přihlašovací údaje');
       }
     } finally {
       setLoading(false);
@@ -70,7 +59,17 @@ const Login = () => {
         </div>
         
         <div className="login-form-container">
-          {error && <div className="login-error">{error}</div>}
+          {error && (
+            <div className="login-error" style={{ 
+              padding: '12px', 
+              background: '#ffebee', 
+              color: '#d32f2f',
+              borderRadius: '4px',
+              marginBottom: '15px' 
+            }}>
+              {error}
+            </div>
+          )}
           
           <div style={{
             margin: '10px 0',
@@ -85,10 +84,9 @@ const Login = () => {
           
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
-              <label htmlFor="username">Přihlašovací jméno iCanteen</label>
+              <label>Přihlašovací jméno iCanteen</label>
               <input
                 type="text"
-                id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Přihlašovací jméno"
@@ -98,10 +96,9 @@ const Login = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="password">Heslo</label>
+              <label>Heslo</label>
               <input
                 type="password"
-                id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Heslo"
