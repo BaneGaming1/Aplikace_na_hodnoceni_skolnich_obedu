@@ -135,27 +135,47 @@ app.get('/api/meals/:mealId/images', async (req, res) => {
 app.delete('/api/images/:imageId', async (req, res) => {
   try {
     const imageId = req.params.imageId;
-    console.log('Mazání fotografie ID:', imageId);
+    const userId = req.query.userId; // Přidáme userId jako query parametr
     
+    console.log('Mazání fotografie ID:', imageId, 'požadavek od uživatele:', userId);
+    
+    // Nejprve získáme informace o fotografii včetně jejího vlastníka
     const [images] = await pool.query('SELECT * FROM meal_images WHERE id = ?', [imageId]);
     
     if (images.length === 0) {
       return res.status(404).json({ error: 'Fotografie nebyla nalezena' });
     }
     
+    const image = images[0];
+    
+    // Kontrola, zda je uživatel vlastníkem obrázku
+    if (image.user_id != userId) {
+      console.log('Odmítnuto - uživatel není vlastníkem:', image.user_id, '!=', userId);
+      return res.status(403).json({ 
+        error: 'Nemáte oprávnění mazat tento obrázek',
+        isOwner: false 
+      });
+    }
+    
+    // Uživatel je vlastníkem, můžeme smazat soubor
     try {
-      const imagePath = path.join(__dirname, 'uploads', images[0].image_path);
+      const imagePath = path.join(__dirname, 'uploads', image.image_path);
       if (fs.existsSync(imagePath)) {
         fs.unlinkSync(imagePath);
         console.log('Soubor smazán:', imagePath);
       }
     } catch (err) {
       console.error('Chyba při mazání souboru:', err);
+      // Pokračujeme i když se soubor nepovede smazat
     }
     
+    // Smažeme záznam z databáze
     await pool.query('DELETE FROM meal_images WHERE id = ?', [imageId]);
     
-    res.json({ success: true, message: 'Fotografie byla smazána' });
+    res.json({ 
+      success: true, 
+      message: 'Fotografie byla smazána' 
+    });
   } catch (error) {
     console.error('Chyba při mazání fotografie:', error);
     res.status(500).json({ error: 'Chyba při mazání fotografie' });

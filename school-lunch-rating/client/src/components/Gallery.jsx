@@ -9,15 +9,19 @@ const Gallery = () => {
   const [images, setImages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   // Při načtení komponenty
   useEffect(() => {
-    // Kontrola přihlášení
+    // Získáme userId z localStorage
     const userId = localStorage.getItem('userId');
     if (!userId) {
       navigate('/login');
       return;
     }
+    
+    // Nastavíme aktuálního uživatele pro kontrolu oprávnění
+    setCurrentUserId(userId);
 
     const fetchData = async () => {
       try {
@@ -68,7 +72,7 @@ const Gallery = () => {
     const formData = new FormData();
     formData.append('image', selectedFile);
     formData.append('mealId', id);
-    formData.append('userId', localStorage.getItem('userId'));
+    formData.append('userId', currentUserId);
     
     try {
       await axios.post('/api/upload-image', formData, {
@@ -89,21 +93,38 @@ const Gallery = () => {
   };
 
   // Mazání fotografie
-  const handleDeleteImage = async (imageId) => {
+  const handleDeleteImage = async (imageId, ownerId) => {
+    // Kontrola, zda uživatel má oprávnění mazat tento obrázek
+    if (ownerId != currentUserId) {
+      alert('Nemáte oprávnění smazat tento obrázek. Mazat můžete pouze své vlastní fotografie.');
+      return;
+    }
+    
     if (!window.confirm('Opravdu chcete smazat tuto fotografii?')) {
       return;
     }
     
     try {
-      await axios.delete(`/api/images/${imageId}`);
+      // Přidáme userId jako query parametr pro autorizaci na serveru
+      await axios.delete(`/api/images/${imageId}?userId=${currentUserId}`);
       
       // Aktualizace seznamu fotografií
       const response = await axios.get(`/api/meals/${id}/images`);
       setImages(response.data);
     } catch (err) {
       console.error('Chyba při mazání fotografie:', err);
-      alert('Nepodařilo se smazat fotografii');
+      
+      if (err.response && err.response.status === 403) {
+        alert('Nemáte oprávnění smazat tento obrázek.');
+      } else {
+        alert('Nepodařilo se smazat fotografii');
+      }
     }
+  };
+
+  // Funkce pro kontrolu, zda je uživatel vlastníkem obrázku
+  const isImageOwner = (imageUserId) => {
+    return imageUserId == currentUserId;
   };
 
   // Formátování data
@@ -180,21 +201,33 @@ const Gallery = () => {
               />
               <div style={{ padding: '10px' }}>
                 <p>{formatDate(image.created_at)}</p>
-                <p>{image.email}</p>
-                <button
-                  onClick={() => handleDeleteImage(image.id)}
-                  style={{
-                    backgroundColor: '#f44336',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    padding: '5px 10px',
-                    width: '100%',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Smazat fotografii
-                </button>
+                <p>{image.email || 'Neznámý uživatel'}</p>
+                {isImageOwner(image.user_id) ? (
+                  <button
+                    onClick={() => handleDeleteImage(image.id, image.user_id)}
+                    style={{
+                      backgroundColor: '#f44336',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '5px 10px',
+                      width: '100%',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Smazat fotografii
+                  </button>
+                ) : (
+                  <p style={{ 
+                    fontSize: '12px', 
+                    color: '#666', 
+                    fontStyle: 'italic',
+                    marginTop: '5px',
+                    textAlign: 'center'
+                  }}>
+                    (Pouze autor může smazat fotografii)
+                  </p>
+                )}
               </div>
             </div>
           ))}
