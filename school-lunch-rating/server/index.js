@@ -165,8 +165,17 @@ app.post('/api/ratings', async (req, res) => {
   try {
     const { mealId, userId, taste, appearance, temperature, portionSize, price, comment } = req.body;
     
-    console.log('PŘIDÁNÍ HODNOCENÍ - mealId:', mealId, 'userId:', userId);
+    console.log('PŘIDÁNÍ HODNOCENÍ - mealId:', mealId, 'userId:', userId, 'data:', req.body);
     
+    // Kontrola všech povinných polí
+    if (!mealId || !userId || !taste || !appearance || !temperature || !portionSize || !price) {
+      return res.status(400).json({ 
+        error: 'Chybí povinné hodnoty', 
+        received: JSON.stringify(req.body) 
+      });
+    }
+    
+    // Kontrola duplicitního hodnocení - oprava klíče v tabulce ratings
     const [existingRatings] = await pool.query(
       'SELECT id FROM ratings WHERE meal_id = ? AND user_id = ?',
       [mealId, userId]
@@ -177,9 +186,10 @@ app.post('/api/ratings', async (req, res) => {
       return res.status(400).json({ error: 'Toto jídlo jste již hodnotili' });
     }
     
+    // Vložení hodnocení s ošetřenými daty
     await pool.query(
       'INSERT INTO ratings (meal_id, user_id, taste, appearance, temperature, portion_size, price, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [mealId, userId, taste, appearance, temperature, portionSize, price, comment]
+      [mealId, userId, taste, appearance, temperature, portionSize, price, comment || '']
     );
     
     console.log('Hodnocení úspěšně přidáno');
@@ -187,7 +197,8 @@ app.post('/api/ratings', async (req, res) => {
   } catch (error) {
     console.error('Chyba při hodnocení:', error);
     res.status(500).json({ 
-      error: 'Chyba serveru při ukládání hodnocení: ' + error.message
+      error: 'Chyba serveru při ukládání hodnocení', 
+      details: error.message 
     });
   }
 });
@@ -306,7 +317,9 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/build')));
   
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+    }
   });
 }
 

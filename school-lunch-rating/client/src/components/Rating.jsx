@@ -51,7 +51,7 @@ const Rating = () => {
         }
 
         const response = await axios.get(
-          `/api/ratings/check/params.id/{params.id}/params.id/{userId}`
+          `/api/ratings/check/${params.id}/${userId}`
         );
         
         if (response.data.hasRated) {
@@ -94,7 +94,13 @@ const Rating = () => {
         comment: rating.comment
       };
 
-      await axios.post('/api/ratings', ratingData);
+      try {
+        await axios.post('/api/ratings', ratingData);
+        console.log("Hodnocení úspěšně odesláno");
+      } catch (error) {
+        console.error("Detail chyby:", error.response?.data);
+        throw error; // Propagace chyby pro další zpracování
+      }
       
       setSuccess(true);
       

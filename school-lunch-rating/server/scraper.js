@@ -4,21 +4,31 @@ const cheerio = require('cheerio');
 
 async function scrapeMeals() {
   try {
-    const response = await axios.get('https://strav.nasejidelna.cz/0341/login', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
+    // Nastavení hlaviček pro simulaci běžného prohlížeče
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'cs-CZ,cs;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    };
 
+    console.log('Začínám scrapovat data z jídelníčku...');
+    const response = await axios.get('https://strav.nasejidelna.cz/0341/login', { headers });
+    
+    // Načítáme HTML pomocí cheerio
     const $ = cheerio.load(response.data);
     const unsortedData = {};
 
-    // Procházíme každý den jídelníčku
+    // Hlavní scrapování - metoda 1 (struktura jidelnicekDen)
+    console.log('Hledám jídelníček strukturu 1...');
     $('.jidelnicekDen').each((i, dayElement) => {
       // Získáme datum z elementu
       const dateText = $(dayElement).find('.jidelnicekTop.semibold').text().trim();
       if (!dateText) return;
 
+      console.log(`Nalezen den: ${dateText}`);
+      
       // Najdeme všechna jídla v daném dni
       const meals = [];
       $(dayElement).find('.column.jidelnicekItem').each((j, mealElement) => {
@@ -31,7 +41,7 @@ async function scrapeMeals() {
 
         // Zkontrolujeme, že máme všechna data
         if (type && name) {
-          // NOVÉ: Vytvoření unikátního ID s datem
+          // Vytvoření unikátního ID s datem
           const dateMatch = dateText.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
           let uniqueId;
           
@@ -46,10 +56,12 @@ async function scrapeMeals() {
           }
           
           meals.push({
-            id: uniqueId, // UNIKÁTNÍ ID
+            id: uniqueId, 
             type: type,
-            name: name
+            name: name,
+            date: dateMatch ? `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}` : null
           });
+          console.log(`- Přidáno jídlo: ${type} - ${name} (ID: ${uniqueId})`);
         }
       });
 
@@ -59,8 +71,10 @@ async function scrapeMeals() {
       }
     });
 
-    // Pokud jsme nenašli žádná data, zkusíme alternativní způsob
+    // Alternativní metoda scrapování - metoda 2 (tabulková struktura)
     if (Object.keys(unsortedData).length === 0) {
+      console.log('Žádná data nenalezena v struktuře 1, zkoušíme strukturu 2...');
+      
       // Hledáme řádky, které obsahují informace o jídle
       $('tr').each((i, row) => {
         const rowText = $(row).text().trim();
@@ -90,6 +104,8 @@ async function scrapeMeals() {
           }
           
           if (dateText) {
+            console.log(`Nalezen den (struktura 2): ${dateText}`);
+            
             // Extrahujeme typ jídla a název
             const cells = $(row).find('td');
             if (cells.length >= 2) {
@@ -110,7 +126,7 @@ async function scrapeMeals() {
                   unsortedData[dateText] = [];
                 }
                 
-                // NOVÉ: Vytvoření unikátního ID s datem
+                // Vytvoření unikátního ID s datem
                 const dateMatch = dateText.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
                 let uniqueId;
                 
@@ -125,10 +141,12 @@ async function scrapeMeals() {
                 }
                 
                 unsortedData[dateText].push({
-                  id: uniqueId, // UNIKÁTNÍ ID
+                  id: uniqueId,
                   type: type,
-                  name: name
+                  name: name,
+                  date: dateMatch ? `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}` : null
                 });
+                console.log(`- Přidáno jídlo (struktura 2): ${type} - ${name} (ID: ${uniqueId})`);
               }
             }
           }
@@ -136,16 +154,60 @@ async function scrapeMeals() {
       });
     }
     
-    // Získáme dnešní datum
-    const today = new Date();
-    const todayYear = today.getFullYear();
-    const todayMonth = today.getMonth();
-    const todayDay = today.getDate();
+    // Pokud stále nemáme data, zkusíme jiné identifikátory
+    if (Object.keys(unsortedData).length === 0) {
+      console.log('Žádná data nenalezena v předchozích strukturách, zkoušíme obecný přístup...');
+      
+      // Hledáme elementy, které mají v textu "Oběd" a den v týdnu nebo datum
+      $('*').each(function() {
+        const text = $(this).text().trim();
+        if (text.includes('Oběd') && text.length < 200) {
+          // Hledáme datum v okolních elementech
+          let dateElement = $(this).prev();
+          let dateText = '';
+          
+          // Zkusíme najít datum v předchozích 5 elementech
+          for (let i = 0; i < 5; i++) {
+            const prevText = dateElement.text().trim();
+            if (prevText.match(/\d{1,2}\.\d{1,2}\.202\d/) || 
+                prevText.match(/(Pondělí|Úterý|Středa|Čtvrtek|Pátek)/i)) {
+              dateText = prevText;
+              break;
+            }
+            dateElement = dateElement.prev();
+          }
+          
+          if (!dateText) {
+            // Zkusíme najít v nadřazených elementech
+            let parent = $(this).parent();
+            for (let i = 0; i < 3; i++) {
+              const siblingElements = parent.children();
+              siblingElements.each(function() {
+                const siblingText = $(this).text().trim();
+                if (siblingText.match(/\d{1,2}\.\d{1,2}\.202\d/) || 
+                    siblingText.match(/(Pondělí|Úterý|Středa|Čtvrtek|Pátek)/i)) {
+                  dateText = siblingText;
+                  return false; // break each loop
+                }
+              });
+              if (dateText) break;
+              parent = parent.parent();
+            }
+          }
+          
+          if (dateText) {
+            console.log(`Nalezen potenciální den (obecný přístup): ${dateText}`);
+            // ...další logika pro získání a ukládání jídel
+          }
+        }
+      });
+    }
     
-    // Reset času na půlnoc pro přesné porovnání
+    // ROZŠÍŘENÉ ŘAZENÍ - více dní dopředu i dozadu
+    console.log('Řazení dat...');
+    const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Nyní seřadíme data, nejdříve dnešní, pak budoucí, a nakonec minulé dny
     const datesWithDistance = [];
     
     for (const dateText in unsortedData) {
@@ -173,16 +235,21 @@ async function scrapeMeals() {
       }
     }
     
-    // Seřadíme nejdříve podle toho, jak blízko je datum k dnešku
-    // Dnešní den (distance = 0) bude první, zítřejší (distance = 1) druhý, atd.
-    // Minulé dny (distance < 0) budou na konci
+    // NOVÉ ŘAZENÍ: nejdřív aktuální den, pak střídavě +1/-1, +2/-2 atd.
     datesWithDistance.sort((a, b) => {
-      // Pokud jsou oba dny v budoucnosti nebo oba v minulosti
-      if ((a.distance >= 0 && b.distance >= 0) || (a.distance < 0 && b.distance < 0)) {
-        return a.distance - b.distance;
+      // Dnešní den má přednost
+      if (a.distance === 0) return -1;
+      if (b.distance === 0) return 1;
+      
+      // Nejdřív podle absolutní hodnoty vzdálenosti (nejblíže k dnešku) 
+      const absA = Math.abs(a.distance);
+      const absB = Math.abs(b.distance);
+      
+      if (absA !== absB) {
+        return absA - absB;
       }
-      // Pokud jeden je v budoucnosti a druhý v minulosti, 
-      // budoucí jde první (menší číslo pro řazení)
+      
+      // Při stejné vzdálenosti upřednostňujeme budoucí dny
       return a.distance < 0 ? 1 : -1;
     });
     
@@ -190,13 +257,26 @@ async function scrapeMeals() {
     const sortedData = {};
     for (const item of datesWithDistance) {
       sortedData[item.dateText] = item.meals;
+      console.log(`Seřazeno: ${item.dateText} (vzdálenost od dneška: ${item.distance} dní)`);
     }
     
+    console.log(`Scrapování dokončeno, nalezeno ${Object.keys(sortedData).length} dní`);
     return sortedData;
   } catch (error) {
     console.error('Chyba při scrapování:', error);
     return {};
   }
+}
+
+// Přidáme funkci pro samostatné spuštění (testování)
+async function testScraper() {
+  const meals = await scrapeMeals();
+  console.log('Výsledek scrapování:', JSON.stringify(meals, null, 2));
+}
+
+// Pokud je soubor spuštěn přímo (node scraper.js), spustí se test
+if (require.main === module) {
+  testScraper().catch(console.error);
 }
 
 module.exports = { scrapeMeals };
