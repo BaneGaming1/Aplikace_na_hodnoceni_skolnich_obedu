@@ -154,55 +154,6 @@ async function scrapeMeals() {
       });
     }
     
-    // Pokud stále nemáme data, zkusíme jiné identifikátory
-    if (Object.keys(unsortedData).length === 0) {
-      console.log('Žádná data nenalezena v předchozích strukturách, zkoušíme obecný přístup...');
-      
-      // Hledáme elementy, které mají v textu "Oběd" a den v týdnu nebo datum
-      $('*').each(function() {
-        const text = $(this).text().trim();
-        if (text.includes('Oběd') && text.length < 200) {
-          // Hledáme datum v okolních elementech
-          let dateElement = $(this).prev();
-          let dateText = '';
-          
-          // Zkusíme najít datum v předchozích 5 elementech
-          for (let i = 0; i < 5; i++) {
-            const prevText = dateElement.text().trim();
-            if (prevText.match(/\d{1,2}\.\d{1,2}\.202\d/) || 
-                prevText.match(/(Pondělí|Úterý|Středa|Čtvrtek|Pátek)/i)) {
-              dateText = prevText;
-              break;
-            }
-            dateElement = dateElement.prev();
-          }
-          
-          if (!dateText) {
-            // Zkusíme najít v nadřazených elementech
-            let parent = $(this).parent();
-            for (let i = 0; i < 3; i++) {
-              const siblingElements = parent.children();
-              siblingElements.each(function() {
-                const siblingText = $(this).text().trim();
-                if (siblingText.match(/\d{1,2}\.\d{1,2}\.202\d/) || 
-                    siblingText.match(/(Pondělí|Úterý|Středa|Čtvrtek|Pátek)/i)) {
-                  dateText = siblingText;
-                  return false; // break each loop
-                }
-              });
-              if (dateText) break;
-              parent = parent.parent();
-            }
-          }
-          
-          if (dateText) {
-            console.log(`Nalezen potenciální den (obecný přístup): ${dateText}`);
-            // ...další logika pro získání a ukládání jídel
-          }
-        }
-      });
-    }
-    
     // ROZŠÍŘENÉ ŘAZENÍ - více dní dopředu i dozadu
     console.log('Řazení dat...');
     const today = new Date();
@@ -223,39 +174,64 @@ async function scrapeMeals() {
         itemDate.setHours(0, 0, 0, 0);
         
         // Vypočítáme rozdíl v dnech od dnešního dne
-        const differenceInTime = itemDate.getTime() - today.getTime();
-        const differenceInDays = Math.round(differenceInTime / (1000 * 3600 * 24));
+        const diffTime = itemDate.getTime() - today.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
         
         datesWithDistance.push({
           dateText: dateText,
           date: itemDate,
-          distance: differenceInDays,
+          distance: diffDays,
           meals: unsortedData[dateText]
         });
       }
     }
     
-    // NOVÉ ŘAZENÍ: nejdřív aktuální den, pak střídavě +1/-1, +2/-2 atd.
+    // NOVÉ VYLEPŠENÉ ŘAZENÍ:
+    // 1. Dnešní den
+    // 2. Budoucí dny (zítřejší, pozítřejší, ...)
+    // 3. Minulé dny (včerejší, předvčerejší, ...)
+    // v rámci každé kategorie seřazeno od nejbližšího k nejvzdálenějšímu
     datesWithDistance.sort((a, b) => {
       // Dnešní den má přednost
       if (a.distance === 0) return -1;
       if (b.distance === 0) return 1;
       
-      // Nejdřív podle absolutní hodnoty vzdálenosti (nejblíže k dnešku) 
-      const absA = Math.abs(a.distance);
-      const absB = Math.abs(b.distance);
+      // Upřednostníme budoucí dny před minulými
+      if (a.distance > 0 && b.distance < 0) return -1;
+      if (a.distance < 0 && b.distance > 0) return 1;
       
-      if (absA !== absB) {
-        return absA - absB;
+      // V rámci budoucích dnů seřadíme od nejbližších
+      if (a.distance > 0 && b.distance > 0) {
+        return a.distance - b.distance;
       }
       
-      // Při stejné vzdálenosti upřednostňujeme budoucí dny
-      return a.distance < 0 ? 1 : -1;
+      // V rámci minulých dnů seřadíme od nejbližších
+      if (a.distance < 0 && b.distance < 0) {
+        return b.distance - a.distance;
+      }
+      
+      return 0;
     });
+    
+    // Zkontrolujeme, zda máme dostatek dní do minulosti a budoucnosti
+    // Chceme zobrazit alespoň 2 dny do minulosti a 3 dny do budoucnosti (pokud existují)
+    let hasPastDays = datesWithDistance.some(item => item.distance < 0);
+    let hasFutureDays = datesWithDistance.some(item => item.distance > 0);
+    
+    console.log(`Data obsahují minulé dny: ${hasPastDays}, budoucí dny: ${hasFutureDays}`);
+    
+    // Omezit počet dní pokud je jich opravdu hodně - zobrazíme jen relevantní dny
+    // (máme dny od -2 do +3, plus dnešek)
+    const filteredDates = datesWithDistance.filter(item => 
+      item.distance >= -2 && item.distance <= 3
+    );
+    
+    // Pokud jsme odfiltrovali nějaké dny, použijeme filtrovaný seznam
+    const datesToUse = filteredDates.length >= 2 ? filteredDates : datesWithDistance;
     
     // Vytvoříme seřazený objekt
     const sortedData = {};
-    for (const item of datesWithDistance) {
+    for (const item of datesToUse) {
       sortedData[item.dateText] = item.meals;
       console.log(`Seřazeno: ${item.dateText} (vzdálenost od dneška: ${item.distance} dní)`);
     }
@@ -268,7 +244,7 @@ async function scrapeMeals() {
   }
 }
 
-// Přidáme funkci pro samostatné spuštění (testování)
+// Funkce pro samostatné testování
 async function testScraper() {
   const meals = await scrapeMeals();
   console.log('Výsledek scrapování:', JSON.stringify(meals, null, 2));
