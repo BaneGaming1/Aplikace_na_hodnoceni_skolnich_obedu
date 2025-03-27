@@ -1,4 +1,5 @@
 const express = require('express');
+const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
@@ -11,7 +12,7 @@ const app = express();
 
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', ],
   credentials: true
 }));
 
@@ -230,69 +231,82 @@ app.post('/api/icanteen-login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    // Testovací přihlášení
-    if (username === 'test' && password === 'test') {
-      return res.json({
-        success: true,
-        userId: 1,
-        username: username
-      });
-    }
+    // Získáme CSRF token a cookies z iCanteen přihlašovací stránky
+    const loginPageResponse = await axios.get('https://strav.nasejidelna.cz/0341/login', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
     
-    // Ověření proti iCanteen
-    const response = await axios.get('https://strav.nasejidelna.cz/0341/login');
-    const $ = cheerio.load(response.data);
+    // Extrahujeme CSRF token
+    const $ = cheerio.load(loginPageResponse.data);
     const csrf = $('input[name="_csrf"]').val();
     
-    if (!csrf) {
-      return res.status(500).json({ success: false, error: 'Chyba serveru' });
-    }
+    // Získáme cookies z odpovědi
+    const cookies = loginPageResponse.headers['set-cookie'];
     
+    // Vytvoříme formdata přesně jak to očekává iCanteen
     const formData = new URLSearchParams();
     formData.append('j_username', username);
     formData.append('j_password', password);
     formData.append('_csrf', csrf);
     
+    if (req.body._spring_security_remember_me) {
+      formData.append('_spring_security_remember_me', 'on');
+    }
+    
+    // Odešleme přihlášení na iCanteen endpoint
     const loginResponse = await axios.post(
       'https://strav.nasejidelna.cz/0341/j_spring_security_check',
       formData.toString(),
       {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Referer': 'https://strav.nasejidelna.cz/0341/login'
+          'Cookie': cookies ? cookies.join('; ') : '',
+          'Referer': 'https://strav.nasejidelna.cz/0341/login',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         },
         maxRedirects: 0,
-        validateStatus: () => true
+        validateStatus: (status) => true  // Přijímáme jakýkoliv status
       }
     );
     
-    // Úspěšné přihlášení dává přesměrování (302)
+    // Zkontrolujeme výsledek
     if (loginResponse.status === 302) {
-      // Přihlášení úspěšné
-      let userId = 1;
+      // Úspěšné přihlášení
+      console.log('iCanteen přihlášení úspěšné');
       
+      // Vložíme nebo aktualizujeme uživatele v DB
+      let userId;
       try {
-        const [users] = await pool.query('SELECT id FROM users WHERE email = ?', [username]);
-        if (users.length > 0) {
-          userId = users[0].id;
-        } else {
+        const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [username]);
+        
+        if (users.length === 0) {
+          // Vytvoření nového uživatele
           const [result] = await pool.query(
             'INSERT INTO users (email, password) VALUES (?, ?)',
-            [username, 'icanteen']
+            [username, password]
           );
           userId = result.insertId;
+        } else {
+          userId = users[0].id;
         }
+        
+        return res.json({
+          success: true,
+          userId: userId,
+          username: username
+        });
       } catch (dbError) {
-        console.error('DB Error:', dbError);
+        console.error('Database error:', dbError);
+        return res.status(500).json({
+          success: false,
+          error: 'Chyba při zpracování uživatelských dat'
+        });
       }
-      
-      return res.json({
-        success: true,
-        userId: userId,
-        username: username
-      });
     } else {
       // Neúspěšné přihlášení
+      console.log('iCanteen přihlášení neúspěšné');
       return res.status(401).json({
         success: false,
         error: 'Neplatné přihlašovací údaje'
@@ -302,7 +316,7 @@ app.post('/api/icanteen-login', async (req, res) => {
     console.error('Login error:', error);
     return res.status(500).json({
       success: false,
-      error: 'Chyba serveru'
+      error: 'Chyba při komunikaci se serverem'
     });
   }
 });
