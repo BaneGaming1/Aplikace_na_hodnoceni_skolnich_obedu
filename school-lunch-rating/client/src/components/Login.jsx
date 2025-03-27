@@ -19,33 +19,19 @@ const Login = () => {
     setError('');
     
     try {
-      let response;
+      // Odesíláme přihlašovací údaje na iCanteen endpoint
+      const response = await axios.post('/api/icanteen-login', {
+        username: credentials.email, // přestože používáme "email" jako název pole v UI, je to uživatelské jméno z iCanteen
+        password: credentials.password
+      });
       
-      if (isICanteenLogin) {
-        // iCanteen přihlášení
-        console.log('Pokus o iCanteen přihlášení:', credentials.email);
-        response = await axios.post('/api/icanteen-login', {
-          username: credentials.email,
-          password: credentials.password
-        });
-      } else {
-        // Standardní přihlášení
-        if (!credentials.email.endsWith('@spsejecna.cz')) {
-          setError('Použijte prosím školní email (@spsejecna.cz)');
-          setLoading(false);
-          return;
-        }
-  
-        const endpoint = isLogin ? 'login' : 'register';
-        response = await axios.post(`/api/${endpoint}`, credentials);
-      }
-      
+      // Zpracování odpovědi
       if (response.data.success) {
-        // Ukládáme údaje do localStorage
+        // Uložení údajů do localStorage pro další použití
         localStorage.setItem('userId', response.data.userId);
-        localStorage.setItem('userEmail', response.data.email);
+        localStorage.setItem('userEmail', response.data.email); // Původní uživatelské jméno
         
-        // Přesměrování na menu
+        // Přesměrování na jídelníček
         navigate('/menu');
       }
     } catch (error) {

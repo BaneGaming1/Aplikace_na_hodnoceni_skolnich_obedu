@@ -1,51 +1,47 @@
 // server/icanteen.js
 const axios = require('axios');
 
+// Konstanta s konfigurací iCanteen serveru
 const ICANTEEN_CONFIG = {
   BASE_URL: 'https://strav.nasejidelna.cz',
   LOGIN_PATH: '/0341/login',
   LOGIN_CHECK_PATH: '/0341/j_spring_security_check',
-  SUCCESS_URL: '/0341/faces/secured/main.jsp'
+  SUCCESS_PATH: '/0341/faces/secured'
 };
 
-// Funkce pro extrakci CSRF tokenu z HTML
-const extractCsrfToken = (html) => {
-  const csrfRegex = /name="_csrf" value="([^"]+)"/;
-  const match = html.match(csrfRegex);
-  return match ? match[1] : null;
-};
-
-// Hlavní funkce pro ověření přihlášení
+/**
+ * Validuje přihlašovací údaje proti iCanteen serveru
+ */
 async function validateICanteenCredentials(username, password) {
-  console.log(`Ověřování iCanteen přihlášení pro uživatele: ${username}`);
-  
-  // Testovací přihlášení
-  if (username === 'test' && password === 'test') {
-    console.log('Testovací přihlášení - úspěšné');
-    return { success: true, message: 'Testovací přihlášení úspěšné' };
-  }
-  
   try {
-    // 1. Získání přihlašovací stránky a CSRF tokenu
-    console.log('Získávání přihlašovací stránky...');
-    const loginPageResponse = await axios.get(
-      `${ICANTEEN_CONFIG.BASE_URL}${ICANTEEN_CONFIG.LOGIN_PATH}`,
-      { 
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      }
-    );
+    console.log(`Ověřování přihlášení iCanteen pro uživatele: ${username}`);
     
-    const csrfToken = extractCsrfToken(loginPageResponse.data);
-    if (!csrfToken) {
-      console.error('CSRF token nebyl nalezen');
-      return { success: false, message: 'Chyba získání bezpečnostního tokenu' };
+    // 1. Nejprve získáme přihlašovací stránku pro získání CSRF tokenu
+    const loginPageResponse = await axios.get(`${ICANTEEN_CONFIG.BASE_URL}${ICANTEEN_CONFIG.LOGIN_PATH}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+      }
+    });
+    
+    // Extrakce CSRF tokenu
+    const csrfMatch = loginPageResponse.data.match(/name="_csrf" value="([^"]+)"/);
+    if (!csrfMatch || !csrfMatch[1]) {
+      console.error('CSRF token nebyl nalezen v přihlašovací stránce');
+      return { success: false, message: 'Technická chyba - nelze získat přihlašovací stránku' };
     }
     
+    const csrfToken = csrfMatch[1];
     console.log('CSRF token získán');
     
-    // 2. Pokus o přihlášení
+    // Získání cookies z odpovědi
+    const cookies = loginPageResponse.headers['set-cookie'];
+    if (!cookies || !cookies.length) {
+      console.error('Cookies nebyly nalezeny v odpovědi');
+      return { success: false, message: 'Technická chyba - nelze získat přihlašovací stránku' };
+    }
+    
+    // 2. Odeslání přihlašovacího formuláře s CSRF tokenem
     const formData = new URLSearchParams();
     formData.append('j_username', username);
     formData.append('j_password', password);
@@ -53,46 +49,49 @@ async function validateICanteenCredentials(username, password) {
     formData.append('_spring_security_remember_me', 'false');
     formData.append('terminal', 'false');
     
-    // Nastavíme maxRedirects na 0, aby axios nesledoval přesměrování
-    // a vracel nám status 302 při úspěšném přihlášení
+    // Provést HTTP požadavek s maxRedirects=0, abychom zachytili přesměrování
     const loginResponse = await axios({
       method: 'post',
       url: `${ICANTEEN_CONFIG.BASE_URL}${ICANTEEN_CONFIG.LOGIN_CHECK_PATH}`,
       data: formData.toString(),
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Referer': `${ICANTEEN_CONFIG.BASE_URL}${ICANTEEN_CONFIG.LOGIN_PATH}`,
+        'Cookie': cookies.join('; '),
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Cookie': loginPageResponse.headers['set-cookie'] // Použití cookies z první odpovědi
+        'Referer': `${ICANTEEN_CONFIG.BASE_URL}${ICANTEEN_CONFIG.LOGIN_PATH}`
       },
-      maxRedirects: 0,
-      validateStatus: function (status) {
-        return status >= 200 && status < 400; // Akceptujeme i 302 přesměrování
+      maxRedirects: 0, // Nesledovat přesměrování
+      validateStatus: function(status) {
+        return status >= 200 && status <= 302; // Akceptujeme i přesměrování
       }
     });
     
-    // 3. Vyhodnocení odpovědi
+    // 3. Kontrola výsledku přihlášení
     if (loginResponse.status === 302) {
-      const redirectUrl = loginResponse.headers.location;
-      const isSuccess = redirectUrl && (
-        redirectUrl.includes('/faces/secured/') || 
-        redirectUrl.includes('terminal=false')
-      );
+      const redirectLocation = loginResponse.headers.location;
       
-      if (isSuccess) {
-        console.log('Přihlášení úspěšné');
-        return { success: true, message: 'Přihlášení úspěšné' };
+      console.log('Přesměrování po přihlášení na:', redirectLocation);
+      
+      // Ověření, že přesměrování jde na zabezpečenou stránku (= úspěšné přihlášení)
+      if (redirectLocation && (
+          redirectLocation.includes(ICANTEEN_CONFIG.SUCCESS_PATH) || 
+          redirectLocation.includes('terminal=false')
+      )) {
+        console.log('iCanteen přihlášení úspěšné!');
+        return { success: true };
       }
     }
     
-    console.log('Přihlášení selhalo - neplatné údaje');
-    return { success: false, message: 'Neplatné přihlašovací údaje' };
+    // Jakýkoliv jiný výsledek znamená neúspěšné přihlášení
+    console.log('iCanteen přihlášení NEÚSPĚŠNÉ!');
+    return { success: false, message: 'Nesprávné uživatelské jméno nebo heslo' };
+    
   } catch (error) {
-    console.error('Chyba při ověřování iCanteen credentials:', error.message);
+    console.error('Chyba při validaci iCanteen:', error.message);
     if (error.response) {
       console.error('Status:', error.response.status);
     }
-    return { success: false, message: 'Chyba při komunikaci s jídelnou' };
+    return { success: false, message: 'Chyba při komunikaci se serverem iCanteen' };
   }
 }
 

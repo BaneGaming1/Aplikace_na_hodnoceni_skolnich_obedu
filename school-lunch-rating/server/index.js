@@ -226,8 +226,12 @@ app.post('/api/ratings', async (req, res) => {
 
 app.post('/api/icanteen-login', async (req, res) => {
   try {
+    // Získání přihlašovacích údajů z požadavku
     const { username, password } = req.body;
     
+    console.log('iCanteen přihlašovací požadavek:', { username });
+    
+    // Kontrola, zda byly poskytnuty oba parametry
     if (!username || !password) {
       return res.status(400).json({ 
         success: false, 
@@ -235,42 +239,48 @@ app.post('/api/icanteen-login', async (req, res) => {
       });
     }
     
+    // DŮLEŽITÉ: Validace proti SKUTEČNÉMU iCanteen serveru
     const validationResult = await validateICanteenCredentials(username, password);
     
+    // Pokud validace nebyla úspěšná, vrátíme chybu
     if (!validationResult.success) {
+      console.log('iCanteen validace selhala:', validationResult.message);
       return res.status(401).json({ 
         success: false, 
         error: validationResult.message || 'Neplatné přihlašovací údaje' 
       });
     }
     
-    // Přihlášení je platné, vytvořme/najděme uživatele v databázi
-    const emailToUse = `${username}@spsejecna.cz`;
+    // Pokud jsme došli sem, přihlášení do iCanteen bylo úspěšné
+    console.log('iCanteen validace úspěšná, přihlašujeme uživatele do naší aplikace');
     
-    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [emailToUse]);
+    // Vytvoříme/najdeme uživatele v naší databázi - používáme pouze username
+    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [username]);
     
     let userId;
     
     if (users.length === 0) {
+      // Vytvoření nového uživatele - jako email použijeme přímo uživatelské jméno
       const [result] = await pool.query(
         'INSERT INTO users (email, password) VALUES (?, ?)',
-        [emailToUse, 'icanteen-verified'] 
+        [username, 'icanteen-verified'] // Heslo není důležité, autentizace je přes iCanteen
       );
       userId = result.insertId;
     } else {
       userId = users[0].id;
     }
     
+    // Vrátíme úspěšnou odpověď - přímo s uživatelským jménem jako identifikátor
     res.json({ 
       success: true, 
       userId: userId, 
-      email: emailToUse
+      email: username // Vracíme původní username
     });
   } catch (error) {
-    console.error('Chyba při iCanteen přihlašování:', error);
+    console.error('Chyba při zpracování iCanteen přihlášení:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Chyba při přihlášení' 
+      error: 'Chyba serveru při zpracování přihlášení' 
     });
   }
 });
