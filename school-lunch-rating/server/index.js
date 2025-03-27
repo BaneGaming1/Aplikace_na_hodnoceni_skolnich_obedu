@@ -203,6 +203,83 @@ app.post('/api/ratings', async (req, res) => {
   }
 });
 
+app.post('/api/icanteen-login', async (req, res) => {
+  try {
+    // Získání přihlašovacích údajů z hlaviček
+    const username = req.headers['x-username'];
+    const password = req.headers['x-password'];
+    
+    // Základní validace vstupu
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Chybí přihlašovací údaje' 
+      });
+    }
+    
+    // Načtení přihlašovací stránky pro získání CSRF tokenu
+    const loginPageResponse = await axios.get('https://strav.nasejidelna.cz/0341/login', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    const $ = cheerio.load(loginPageResponse.data);
+    const csrf = $('input[name="_csrf"]').val();
+    
+    if (!csrf) {
+      return res.status(500).json({
+        success: false,
+        error: 'Nepodařilo se načíst přihlašovací stránku'
+      });
+    }
+    
+    // Sestavení přihlašovacího formuláře
+    const formData = new URLSearchParams();
+    formData.append('j_username', username);
+    formData.append('j_password', password);
+    formData.append('_csrf', csrf);
+    
+    // Odeslání přihlášení
+    const loginResponse = await axios.post(
+      'https://strav.nasejidelna.cz/0341/j_spring_security_check',
+      formData.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': 'https://strav.nasejidelna.cz/0341/login',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        maxRedirects: 0,
+        validateStatus: () => true
+      }
+    );
+    
+    // Vyhodnocení odpovědi
+    if (loginResponse.status === 302) {
+      // Přihlášení úspěšné (server vrací přesměrování)
+      return res.json({
+        success: true,
+        userId: Buffer.from(`${username}_${Date.now()}`).toString('base64'),
+        username: username
+      });
+    } else {
+      // Přihlášení neúspěšné
+      return res.status(401).json({
+        success: false,
+        error: 'Neplatné přihlašovací údaje'
+      });
+    }
+  } catch (error) {
+    console.error('Chyba při přihlašování:', error);
+    
+    return res.status(500).json({
+      success: false,
+      error: 'Chyba při komunikaci se serverem jídelny'
+    });
+  }
+});
+
 app.get('/api/ratings/:mealId', async (req, res) => {
   try {
     const mealId = req.params.mealId;
