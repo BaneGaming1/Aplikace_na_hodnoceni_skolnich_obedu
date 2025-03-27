@@ -7,6 +7,7 @@ const multer = require('multer');
 const { scrapeMeals } = require('./scraper');
 const { pool, testConnection } = require('./db');
 const { validateICanteenCredentials } = require('./icanteen');
+const cheerio = require('cheerio');
 
 const app = express();
 
