@@ -4,11 +4,13 @@ import axios from 'axios';
 
 const Login = () => {
   const [credentials, setCredentials] = useState({
-    username: '',
+    email: '',
     password: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
+  const [isICanteenLogin, setIsICanteenLogin] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -17,52 +19,109 @@ const Login = () => {
     setError('');
     
     try {
-      // Volání API pro ověření přihlášení proti iCanteen
-      const response = await axios.post('/api/icanteen-login', {}, {
-        headers: {
-          'X-USERNAME': credentials.username,
-          'X-PASSWORD': credentials.password
+      let response;
+      
+      if (isICanteenLogin) {
+        // iCanteen přihlášení
+        console.log('Pokus o iCanteen přihlášení:', credentials.email);
+        response = await axios.post('/api/icanteen-login', {
+          username: credentials.email, // v případě iCanteen přihlášení je to username, ne email
+          password: credentials.password
+        });
+      } else {
+        // Standardní přihlášení - validace školní domény
+        if (!credentials.email.endsWith('@spsejecna.cz')) {
+          setError('Použijte prosím školní email (@spsejecna.cz)');
+          setLoading(false);
+          return;
         }
-      });
+
+        const endpoint = isLogin ? 'login' : 'register';
+        console.log(`Použití endpointu: /api/${endpoint}`);
+        response = await axios.post(`/api/${endpoint}`, credentials);
+      }
+      
+      console.log('Odpověď serveru:', response.data);
       
       if (response.data.success) {
-        // Uložíme ID uživatele do localStorage pro další použití
+        // Uložíme ID uživatele do sessionStorage pro větší bezpečnost a izolaci mezi okny
+        sessionStorage.setItem('userId', response.data.userId);
+        sessionStorage.setItem('userEmail', response.data.email || credentials.email);
+        
+        // Také uložíme do localStorage pro kompatibilitu (může být odstraněno později)
         localStorage.setItem('userId', response.data.userId);
-        localStorage.setItem('userEmail', credentials.username);
+        localStorage.setItem('userEmail', response.data.email || credentials.email);
+        
         navigate('/menu');
+      } else {
+        // Pokud server vrátil success: false bez vyhození chyby
+        setError(response.data.error || 'Neznámá chyba při přihlašování');
       }
     } catch (error) {
       console.error('Chyba při přihlašování:', error);
+      
+      if (error.response) {
+        console.error('Detaily chyby:', error.response.status, error.response.data);
+      }
+      
       if (error.response && error.response.data && error.response.data.error) {
         setError(error.response.data.error);
+      } else if (error.message && error.message.includes('Network Error')) {
+        setError('Nelze se připojit k serveru. Zkontrolujte své připojení k internetu.');
       } else {
-        setError('Nepodařilo se přihlásit. Zkuste to prosím později.');
+        setError(isICanteenLogin 
+          ? 'Nepodařilo se přihlásit přes iCanteen. Zkuste to prosím později.'
+          : (isLogin 
+              ? 'Nepodařilo se přihlásit. Zkuste to prosím později.' 
+              : 'Nepodařilo se zaregistrovat. Zkuste to prosím později.'));
       }
     } finally {
       setLoading(false);
     }
   };
 
+  const toggleAuthMode = () => {
+    setIsLogin(!isLogin);
+    setError('');
+  };
+
+  const toggleLoginType = () => {
+    setIsICanteenLogin(!isICanteenLogin);
+    setError('');
+    // Reset pole při přepnutí typu přihlášení
+    setCredentials({
+      email: '',
+      password: ''
+    });
+  };
+
   return (
     <div className="login-page">
       <div className="login-container">
         <div className="login-header">
-          <h1>Přihlášení do systému</h1>
-          <p className="login-subtitle">Hodnocení školních obědů</p>
+          <h1>{isICanteenLogin ? 'Přihlášení přes iCanteen' : 'Přihlášení'}</h1>
+          <p className="login-subtitle">Systém hodnocení školních obědů</p>
         </div>
         
         <div className="login-form-container">
           {error && <div className="login-error">{error}</div>}
           
+          {isICanteenLogin && (
+            <div className="icanteen-info" style={{ margin: '10px 0', padding: '10px', backgroundColor: '#f0f8ff', borderRadius: '5px', fontSize: '14px' }}>
+              Použijte stejné přihlašovací údaje jako do systému jídelny.<br />
+              Pro testování můžete použít: <strong>test / test</strong>
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
-              <label htmlFor="username">Přihlašovací jméno iCanteen</label>
+              <label htmlFor="email">{isICanteenLogin ? 'Uživatelské jméno iCanteen' : 'Školní email'}</label>
               <input
-                type="text"
-                id="username"
-                value={credentials.username}
-                onChange={(e) => setCredentials({...credentials, username: e.target.value})}
-                placeholder="Zadejte přihlašovací jméno do jídelny"
+                type={isICanteenLogin ? "text" : "email"}
+                id="email"
+                value={credentials.email}
+                onChange={(e) => setCredentials({...credentials, email: e.target.value})}
+                placeholder={isICanteenLogin ? 'Zadejte uživatelské jméno' : 'jmeno.prijmeni@spsejecna.cz'}
                 required
                 className="login-input"
               />
@@ -75,7 +134,7 @@ const Login = () => {
                 id="password"
                 value={credentials.password}
                 onChange={(e) => setCredentials({...credentials, password: e.target.value})}
-                placeholder="Zadejte heslo do jídelny"
+                placeholder="Zadejte heslo"
                 required
                 className="login-input"
               />
@@ -86,18 +145,32 @@ const Login = () => {
               className="login-button"
               disabled={loading}
             >
-              {loading ? 'Prosím čekejte...' : 'Přihlásit se'}
+              {loading ? 'Prosím čekejte...' : (isICanteenLogin 
+                ? 'Přihlásit se přes iCanteen'
+                : (isLogin ? 'Přihlásit se' : 'Zaregistrovat se'))}
             </button>
           </form>
 
-          <div className="login-footer">
-            <p>
-              Použijte stejné přihlašovací údaje jako do systému školní jídelny.
-            </p>
-            <p>
-              Pro testování můžete použít: test / test
-            </p>
+          <div className="login-type-toggle" style={{ textAlign: 'center', marginTop: '15px', marginBottom: '10px' }}>
+            <button 
+              onClick={toggleLoginType} 
+              className="toggle-auth-btn"
+              type="button"
+            >
+              {isICanteenLogin ? 'Přepnout na standardní přihlášení' : 'Přepnout na iCanteen přihlášení'}
+            </button>
           </div>
+
+          {!isICanteenLogin && (
+            <div className="login-footer">
+              <p>
+                {isLogin ? 'Nemáte účet?' : 'Máte již účet?'} 
+                <button onClick={toggleAuthMode} className="toggle-auth-btn">
+                  {isLogin ? 'Zaregistrovat se' : 'Přihlásit se'}
+                </button>
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
