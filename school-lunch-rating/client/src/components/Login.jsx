@@ -3,61 +3,58 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const Login = () => {
-  const [credentials, setCredentials] = useState({
-    username: '',
-    password: '',
-    remember_me: false
-  });
-  
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!username || !password) {
+      setError('Zadejte prosím uživatelské jméno a heslo.');
+      return;
+    }
+    
     setLoading(true);
     setError('');
     
     try {
-      // Odesílá přesně ve formátu, který iCanteen očekává
-      const formData = {
-        j_username: credentials.username,
-        j_password: credentials.password
-      };
+      // ŽÁDNÉ obcházení ověřování zde
+      const response = await axios({
+        method: 'POST',
+        url: '/api/icanteen-login',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-USERNAME': username,
+          'X-PASSWORD': password
+        },
+        data: {
+          username,
+          password
+        }
+      });
       
-      if (credentials.remember_me) {
-        formData._spring_security_remember_me = 'on';
-      }
-      
-      // Testovací přihlášení
-      if (credentials.username === 'test' && credentials.password === 'test') {
-        localStorage.setItem('userId', 'test-user');
-        localStorage.setItem('userEmail', 'test');
-        navigate('/menu');
-        return;
-      }
-      
-      // Odeslání na server, který komunikuje s iCanteen
-      const response = await axios.post('/api/icanteen-login', formData);
-      
+      // Přihlášení bylo úspěšné POUZE když server vrátí success: true
       if (response.data && response.data.success) {
-        // Úspěšné přihlášení
         localStorage.setItem('userId', response.data.userId);
-        localStorage.setItem('userEmail', response.data.username);
+        localStorage.setItem('userEmail', username);
         navigate('/menu');
       } else {
-        // Neúspěšné přihlášení, ale server odpověděl
-        setError(response.data?.error || 'Přihlášení se nezdařilo');
+        // Toto by nemělo nikdy nastat, server by měl vracet HTTP chybu při neúspěchu
+        setError('Přihlášení selhalo. Zkontrolujte své údaje.');
       }
     } catch (error) {
       console.error('Chyba při přihlašování:', error);
       
+      // Server vrátil chybu - NEPOUŠTÍME uživatele dál
       if (error.response?.status === 401) {
-        setError('Neplatné přihlašovací údaje');
+        setError('Neplatné přihlašovací údaje. Zkontrolujte své uživatelské jméno a heslo.');
       } else if (error.response?.data?.error) {
         setError(error.response.data.error);
       } else {
-        setError('Chyba při komunikaci se serverem. Zkuste to prosím později.');
+        setError('Chyba při komunikaci se serverem. Zkuste to prosím znovu.');
       }
     } finally {
       setLoading(false);
@@ -73,14 +70,15 @@ const Login = () => {
         </div>
         
         <div className="login-form-container">
-          {error && (
-            <div className="login-error">
-              {error}
-            </div>
-          )}
+          {error && <div className="login-error">{error}</div>}
           
-          {/* Informace pro testování */}
-          <div className="login-info">
+          <div style={{
+            margin: '10px 0',
+            padding: '12px',
+            backgroundColor: '#f0f8ff',
+            borderRadius: '5px',
+            fontSize: '14px'
+          }}>
             Pro přihlášení použijte vaše přihlašovací údaje do systému iCanteen.<br />
             Pro testování můžete použít: <strong>test / test</strong>
           </div>
@@ -90,13 +88,12 @@ const Login = () => {
               <label htmlFor="username">Přihlašovací jméno iCanteen</label>
               <input
                 type="text"
-                id="j_username"
-                name="j_username"
-                value={credentials.username}
-                onChange={(e) => setCredentials({...credentials, username: e.target.value})}
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 placeholder="Přihlašovací jméno"
                 required
-                className="login-input form-control"
+                className="login-input"
               />
             </div>
 
@@ -104,45 +101,33 @@ const Login = () => {
               <label htmlFor="password">Heslo</label>
               <input
                 type="password"
-                id="j_password"
-                name="j_password"
-                value={credentials.password}
-                onChange={(e) => setCredentials({...credentials, password: e.target.value})}
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Heslo"
                 required
-                className="login-input form-control"
-                autoComplete="current-password"
+                className="login-input"
               />
             </div>
             
-            <div className="form-group remember-me">
+            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input
                 type="checkbox"
-                id="_spring_security_remember_me"
-                name="_spring_security_remember_me"
-                checked={credentials.remember_me}
-                onChange={(e) => setCredentials({...credentials, remember_me: e.target.checked})}
-                className="checkbox-inline"
+                id="remember_me"
               />
-              <label htmlFor="_spring_security_remember_me">
+              <label htmlFor="remember_me" style={{ margin: 0 }}>
                 Neodhlašovat mě na tomto počítači.
               </label>
             </div>
 
             <button 
               type="submit" 
-              className="login-button btn btn-primary"
+              className="login-button"
               disabled={loading}
             >
               {loading ? 'Přihlašování...' : 'Přihlásit'}
             </button>
           </form>
-
-          <div className="login-footer">
-            <a href="#" onClick={(e) => { e.preventDefault(); }}>
-              Obnovit zapomenuté heslo
-            </a>
-          </div>
         </div>
       </div>
     </div>
