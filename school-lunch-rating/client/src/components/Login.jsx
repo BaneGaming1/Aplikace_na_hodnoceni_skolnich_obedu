@@ -25,55 +25,36 @@ const Login = () => {
         // iCanteen přihlášení
         console.log('Pokus o iCanteen přihlášení:', credentials.email);
         response = await axios.post('/api/icanteen-login', {
-          username: credentials.email, // v případě iCanteen přihlášení je to username, ne email
+          username: credentials.email,
           password: credentials.password
         });
       } else {
-        // Standardní přihlášení - validace školní domény
+        // Standardní přihlášení
         if (!credentials.email.endsWith('@spsejecna.cz')) {
           setError('Použijte prosím školní email (@spsejecna.cz)');
           setLoading(false);
           return;
         }
-
+  
         const endpoint = isLogin ? 'login' : 'register';
-        console.log(`Použití endpointu: /api/${endpoint}`);
         response = await axios.post(`/api/${endpoint}`, credentials);
       }
       
-      console.log('Odpověď serveru:', response.data);
-      
       if (response.data.success) {
-        // Uložíme ID uživatele do sessionStorage pro větší bezpečnost a izolaci mezi okny
-        sessionStorage.setItem('userId', response.data.userId);
-        sessionStorage.setItem('userEmail', response.data.email || credentials.email);
-        
-        // Také uložíme do localStorage pro kompatibilitu (může být odstraněno později)
+        // Ukládáme údaje do localStorage
         localStorage.setItem('userId', response.data.userId);
-        localStorage.setItem('userEmail', response.data.email || credentials.email);
+        localStorage.setItem('userEmail', response.data.email);
         
+        // Přesměrování na menu
         navigate('/menu');
-      } else {
-        // Pokud server vrátil success: false bez vyhození chyby
-        setError(response.data.error || 'Neznámá chyba při přihlašování');
       }
     } catch (error) {
       console.error('Chyba při přihlašování:', error);
       
-      if (error.response) {
-        console.error('Detaily chyby:', error.response.status, error.response.data);
-      }
-      
       if (error.response && error.response.data && error.response.data.error) {
         setError(error.response.data.error);
-      } else if (error.message && error.message.includes('Network Error')) {
-        setError('Nelze se připojit k serveru. Zkontrolujte své připojení k internetu.');
       } else {
-        setError(isICanteenLogin 
-          ? 'Nepodařilo se přihlásit přes iCanteen. Zkuste to prosím později.'
-          : (isLogin 
-              ? 'Nepodařilo se přihlásit. Zkuste to prosím později.' 
-              : 'Nepodařilo se zaregistrovat. Zkuste to prosím později.'));
+        setError('Nepodařilo se přihlásit. Zkuste to prosím později.');
       }
     } finally {
       setLoading(false);

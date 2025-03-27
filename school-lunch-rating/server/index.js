@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { scrapeMeals } = require('./scraper');
 const { pool, testConnection } = require('./db');
-const { loginToICanteen } = require('./icanteen');
+const { validateICanteenCredentials } = require('./icanteen');
 
 const app = express();
 
@@ -208,9 +208,6 @@ app.post('/api/icanteen-login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    console.log('iCanteen login request:', { username });
-    
-    // Chybí-li některý z parametrů
     if (!username || !password) {
       return res.status(400).json({ 
         success: false, 
@@ -218,44 +215,42 @@ app.post('/api/icanteen-login', async (req, res) => {
       });
     }
     
-    // Pokus o přihlášení do iCanteen
-    const iCanteenResult = await loginToICanteen(username, password);
+    const validationResult = await validateICanteenCredentials(username, password);
     
-    if (!iCanteenResult.success) {
+    if (!validationResult.success) {
       return res.status(401).json({ 
         success: false, 
-        error: 'Nesprávné uživatelské jméno nebo heslo' 
+        error: validationResult.message || 'Neplatné přihlašovací údaje' 
       });
     }
     
-    // Ověříme, zda uživatel existuje v naší databázi, případně ho vytvoříme
-    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [`${username}@spsejecna.cz`]);
+    // Přihlášení je platné, vytvořme/najděme uživatele v databázi
+    const emailToUse = `${username}@spsejecna.cz`;
+    
+    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [emailToUse]);
     
     let userId;
     
     if (users.length === 0) {
-      // Uživatel neexistuje, vytvoříme ho
       const [result] = await pool.query(
         'INSERT INTO users (email, password) VALUES (?, ?)',
-        [`${username}@spsejecna.cz`, 'icanteen-auth']  // Heslo není důležité při iCanteen auth
+        [emailToUse, 'icanteen-verified'] 
       );
       userId = result.insertId;
     } else {
-      // Uživatel existuje
       userId = users[0].id;
     }
     
-    // Odpověď s úspěšným přihlášením
     res.json({ 
       success: true, 
-      userId, 
-      email: `${username}@spsejecna.cz`
+      userId: userId, 
+      email: emailToUse
     });
   } catch (error) {
     console.error('Chyba při iCanteen přihlašování:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Chyba při komunikaci se serverem jídelny'
+      error: 'Chyba při přihlášení' 
     });
   }
 });
