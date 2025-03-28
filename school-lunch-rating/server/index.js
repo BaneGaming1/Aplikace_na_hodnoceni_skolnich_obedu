@@ -230,69 +230,44 @@ app.post('/api/ratings', async (req, res) => {
 
 // server/index.js - endpoint pro přihlášení
 
-app.post('/api/icanteen-login', async (req, res) => {
-  // Získat jméno a heslo
-  const username = req.body.username || req.headers['x-username'];
-  const password = req.body.password || req.headers['x-password'];
-  
-  console.log(`Pokus o přihlášení: ${username}`);
-  
-  // Test/test vždy funguje
-  if (username === 'test' && password === 'test') {
-    return res.json({
-      success: true,
-      userId: 'test-user-id',
-      username: 'test'
-    });
-  }
-  
+app.post('/api/login', async (req, res) => {
   try {
-    // Pokus o přihlášení do iCanteen
-    const response = await axios.get('https://strav.nasejidelna.cz/0341/login');
-    const $ = cheerio.load(response.data);
-    const csrf = $('input[name="_csrf"]').val();
+    const { email, password } = req.body;
     
-    // Sestavení přihlašovacích údajů
-    const formData = new URLSearchParams();
-    formData.append('j_username', username);
-    formData.append('j_password', password);
-    formData.append('_csrf', csrf);
-    
-    // Pokus o přihlášení
-    const loginResponse = await axios.post(
-      'https://strav.nasejidelna.cz/0341/j_spring_security_check',
-      formData.toString(),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Referer': 'https://strav.nasejidelna.cz/0341/login'
-        },
-        maxRedirects: 0,
-        validateStatus: () => true
-      }
-    );
-    
-    // Kontrola, zda přihlášení uspělo - 302 znamená přesměrování (úspěch)
-    if (loginResponse.status === 302) {
-      // Přihlášení uspělo
-      return res.json({
-        success: true,
-        userId: 'user-' + Date.now(),
-        username: username
-      });
-    } else {
-      // Přihlášení selhalo - ODMÍTNEME uživatele
-      return res.status(401).json({
-        success: false,
-        error: 'Neplatné přihlašovací údaje'
-      });
+    // Validace emailu
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Zadejte platný email' });
     }
+    
+    // Kontrola školní domény
+    if (!email.toLowerCase().endsWith('@spsejecna.cz')) {
+      return res.status(401).json({ error: 'Přihlášení je povoleno pouze se školním emailem (@spsejecna.cz)' });
+    }
+    
+    // Kontrola, zda uživatel existuje
+    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    
+    let userId;
+    
+    if (users.length === 0) {
+      // Uživatel neexistuje, vytvoříme ho
+      const [result] = await pool.query(
+        'INSERT INTO users (email, password) VALUES (?, ?)',
+        [email, password]
+      );
+      userId = result.insertId;
+    } else {
+      // Uživatel existuje, ověříme heslo
+      if (users[0].password !== password) {
+        return res.status(401).json({ error: 'Nesprávné heslo' });
+      }
+      userId = users[0].id;
+    }
+    
+    res.json({ success: true, userId, email });
   } catch (error) {
-    console.error('Chyba:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Chyba při přihlašování'
-    });
+    console.error('Chyba při přihlašování:', error);
+    res.status(500).json({ error: 'Chyba serveru při přihlašování' });
   }
 });
 

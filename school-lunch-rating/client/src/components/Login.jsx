@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -11,29 +11,29 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!username || !password) {
-      setError('Zadejte přihlašovací údaje');
-      return;
-    }
-    
     setLoading(true);
     setError('');
     
     try {
+      // Validace školního emailu
+      if (!email.toLowerCase().endsWith('@spsejecna.cz')) {
+        setError('Přístup je povolen pouze s emailem domény @spsejecna.cz');
+        setLoading(false);
+        return;
+      }
+
       // Pokus o přihlášení
-      const response = await axios.post('/api/icanteen-login', { 
-        username, 
+      const response = await axios.post('http://localhost:5000/api/login', { 
+        email, 
         password 
       });
       
       if (response.data.success) {
-        // Přihlášení uspělo
+        // Přihlášení úspěšné
         localStorage.setItem('userId', response.data.userId);
-        localStorage.setItem('userEmail', username);
+        localStorage.setItem('userEmail', email);
         navigate('/menu');
       } else {
-        // Přihlášení selhalo
         setError('Přihlášení selhalo');
       }
     } catch (error) {
@@ -71,25 +71,14 @@ const Login = () => {
             </div>
           )}
           
-          <div style={{
-            margin: '10px 0',
-            padding: '12px',
-            backgroundColor: '#f0f8ff',
-            borderRadius: '5px',
-            fontSize: '14px'
-          }}>
-            Pro přihlášení použijte vaše přihlašovací údaje do systému iCanteen.<br />
-            Pro testování můžete použít: <strong>test / test</strong>
-          </div>
-          
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
-              <label>Přihlašovací jméno iCanteen</label>
+              <label>Školní email</label>
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Přihlašovací jméno"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vas.email@spsejecna.cz"
                 required
                 className="login-input"
               />
@@ -106,16 +95,6 @@ const Login = () => {
                 className="login-input"
               />
             </div>
-            
-            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <input
-                type="checkbox"
-                id="remember_me"
-              />
-              <label htmlFor="remember_me" style={{ margin: 0 }}>
-                Neodhlašovat mě na tomto počítači.
-              </label>
-            </div>
 
             <button 
               type="submit" 
@@ -125,6 +104,12 @@ const Login = () => {
               {loading ? 'Přihlašování...' : 'Přihlásit'}
             </button>
           </form>
+          
+          <div className="login-footer">
+            <p>
+              Přihlaste se svým školním emailem @spsejecna.cz
+            </p>
+          </div>
         </div>
       </div>
     </div>
